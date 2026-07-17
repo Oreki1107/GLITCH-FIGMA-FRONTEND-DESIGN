@@ -1,4 +1,5 @@
-import type { GlitchProduct, ProductPresentation } from "@/domain/types";
+import type { ProductModel } from "@/domain/shared/models";
+import type { ProductPresentation } from "@/domain/types";
 import { SystemLabel } from "@/components/primitives";
 
 type ProductCardProps = {

@@ -1,10 +1,11 @@
-import type { GlitchProduct, ProductPresentation } from "@/domain/types";
+import type { ProductModel } from "@/domain/shared/models";
+import type { ProductPresentation } from "@/domain/types";
 import { getPresentation } from "@/data/mock";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { ProductCard } from "./ProductCard";
 
 type ProductGridProps = {
-  items: GlitchProduct[];
+  items: ProductModel[];
   presentations: Map<string, ProductPresentation>;
   onOpen: (product: GlitchProduct) => void;
   expandedIndex?: number | null;

@@ -1,7 +1,7 @@
-import type { GlitchProduct } from "@/domain/types";
+import type { ProductModel } from "@/domain/shared/models";
 import { money } from "@/domain/types";
 
-export const mockProducts: GlitchProduct[] = [
+export const mockProducts: ProductModel[] = [
   {
     id: "1",
     handle: "offset-shell",

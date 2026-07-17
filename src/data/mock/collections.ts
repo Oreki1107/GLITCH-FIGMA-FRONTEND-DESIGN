@@ -1,6 +1,6 @@
-import type { GlitchCollection } from "@/domain/types";
+import type { CollectionModel } from "@/domain/shared/models";
 
-export const mockCollections: GlitchCollection[] = [
+export const mockCollections: CollectionModel[] = [
   {
     id: "1",
     handle: "after-image",

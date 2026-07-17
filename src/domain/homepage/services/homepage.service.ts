@@ -1,7 +1,7 @@
-import type { GlitchHomeModule } from '@/domain/types';
+import type { HomepageModuleModel } from '@/domain/shared/models';
 
 export interface HomepageService {
-  getModules(): Promise<GlitchHomeModule[]>;
+  getModules(): Promise<HomepageModuleModel[]>;
 }
 
 export const homepageService: HomepageService = {

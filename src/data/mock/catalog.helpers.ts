@@ -1,26 +1,26 @@
-import type { GlitchCollection, GlitchProduct } from "@/domain/types";
+import type { CollectionModel, ProductModel } from "@/domain/shared/models";
 
-export function productsByIds(products: GlitchProduct[], ids?: string[]): GlitchProduct[] {
+export function productsByIds(products: ProductModel[], ids?: string[]): ProductModel[] {
   return (ids ?? [])
     .map((id) => products.find((product) => product.id === id))
-    .filter((product): product is GlitchProduct => Boolean(product));
+    .filter((product): product is ProductModel => Boolean(product));
 }
 
 export function collectionsByHandles(
-  collections: GlitchCollection[],
+  collections: CollectionModel[],
   handles?: string[],
-): GlitchCollection[] {
+): CollectionModel[] {
   return (handles ?? [])
     .map((handle) => collections.find((collection) => collection.handle === handle))
-    .filter((collection): collection is GlitchCollection => Boolean(collection));
+    .filter((collection): collection is CollectionModel => Boolean(collection));
 }
 
-export function deriveCategories(products: GlitchProduct[]): string[] {
+export function deriveCategories(products: ProductModel[]): string[] {
   return Array.from(new Set(products.map((product) => product.categoryTitle))).filter(Boolean);
 }
 
 export function filterProducts(
-  products: GlitchProduct[],
+  products: ProductModel[],
   category: string,
   collection: string,
 ): GlitchProduct[] {
@@ -31,7 +31,7 @@ export function filterProducts(
   );
 }
 
-export function searchProducts(products: GlitchProduct[], query: string): GlitchProduct[] {
+export function searchProducts(products: ProductModel[], query: string): ProductModel[] {
   const normalized = query.toLowerCase();
   return products.filter((product) =>
     `${product.title} ${product.collectionTitle} ${product.categoryTitle}`

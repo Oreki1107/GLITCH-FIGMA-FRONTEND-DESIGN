@@ -1,4 +1,4 @@
-import type { GlitchCollection } from "@/domain/types";
+import type { CollectionModel } from "@/domain/shared/models";
 import { SystemLabel } from "@/components/primitives";
 
 type CollectionTabsProps = {

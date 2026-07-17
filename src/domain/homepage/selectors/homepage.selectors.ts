@@ -1,5 +1,5 @@
-import type { GlitchHomeModule } from '@/domain/types';
+import type { HomepageModuleModel } from '@/domain/shared/models';
 
-export function selectHomepageModules(modules: GlitchHomeModule[]) {
+export function selectHomepageModules(modules: HomepageModuleModel[]) {
   return modules;
 }

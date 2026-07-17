@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownRight,
   ArrowLeft,
@@ -14,47 +14,38 @@ import {
   ShoppingBag,
   X,
 } from "lucide-react";
-import type { GlitchProduct, View } from "@/domain/types";
+import type { CollectionModel, ProductModel, ViewModel } from "@/domain/shared/models";
 import {
-  mockProducts,
-  mockCollections,
+  HERO_IMAGE_URL,
   mockProductPresentations,
   presentationMap,
   getPresentation,
-  HERO_IMAGE_URL,
-  archiveProductIds,
-  productsByIds,
-  collectionsByHandles,
-  deriveCategories,
-  filterProducts,
-  searchProducts,
-  getHomepageModule,
 } from "@/data/mock";
+import { catalogService } from "@/domain/catalog/services/catalog.service";
+import { homepageRuntimeService, type HomepageRuntimeData } from "@/domain/homepage/services/homepage-runtime.service";
 import { SystemLabel, SectionHeading, BottomControl } from "@/components/primitives";
 import { ProductCard, ProductGrid } from "@/components/product";
 import { CollectionTabs } from "@/components/collection";
 
-const products = mockProducts;
-const collections = mockCollections;
 const presentations = presentationMap(mockProductPresentations);
 
 function App() {
-  const [view, setView] = useState<View>("home");
-  const [routeHistory, setRouteHistory] = useState<View[]>([]);
+  const [view, setView] = useState<ViewModel>("home");
+  const [routeHistory, setRouteHistory] = useState<ViewModel[]>([]);
   const [navOpen, setNavOpen] = useState(false);
-  const [selected, setSelected] = useState<GlitchProduct>(products[0]);
+  const [selected, setSelected] = useState<ProductModel | null>(null);
   const [collection, setCollection] = useState("all");
   const [category, setCategory] = useState("all");
-  const [cart, setCart] = useState<GlitchProduct[]>([]);
+  const [cart, setCart] = useState<ProductModel[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
-  const [recentlyViewed, setRecentlyViewed] = useState<GlitchProduct[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<ProductModel[]>([]);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [strip, setStrip] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [size, setSize] = useState("M");
 
-  const go = (next: View) => {
+  const go = (next: ViewModel) => {
     if (next !== view) setRouteHistory((items) => [...items, view].slice(-16));
     setView(next);
     setNavOpen(false);
@@ -69,7 +60,7 @@ function App() {
       return items.slice(0, -1);
     });
   };
-  const openProduct = (p: GlitchProduct) => {
+  const openProduct = (p: ProductModel) => {
     setSelected(p);
     setRecentlyViewed((items) => [p, ...items.filter((item) => item.id !== p.id)].slice(0, 4));
     go("product");
@@ -82,36 +73,66 @@ function App() {
   const toggleWish = (id: string) =>
     setWishlist((items) => (items.includes(id) ? items.filter((item) => item !== id) : [...items, id]));
 
-  const filtered = useMemo(
-    () => filterProducts(products, category, collection),
-    [category, collection],
-  );
-  const activeCollection = collections.find((item) => item.title === collection);
-  const categories = useMemo(() => deriveCategories(products), []);
+  const [products, setProducts] = useState<ProductModel[]>([]);
+  const [collections, setCollections] = useState<CollectionModel[]>([]);
+  const [homepageData, setHomepageData] = useState<HomepageRuntimeData | null>(null);
 
-  const heroProduct = productsByIds(products, getHomepageModule("hero")?.productIds)[0];
-  const featuredProducts = productsByIds(products, getHomepageModule("featuredProducts")?.productIds);
-  const homeCollections = collectionsByHandles(
-    collections,
-    getHomepageModule("collectionPreview")?.collectionHandles,
+  useEffect(() => {
+    let active = true;
+
+    const load = async () => {
+      const [catalogProducts, catalogCollections, homepage] = await Promise.all([
+        catalogService.getProducts(),
+        catalogService.getCollections(),
+        homepageRuntimeService.getHomepageData(),
+      ]);
+
+      if (!active) return;
+
+      setProducts(catalogProducts);
+      setCollections(catalogCollections);
+      setHomepageData(homepage);
+      if (!selected) {
+        setSelected(catalogProducts[0] ?? null);
+      }
+    };
+
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!products.length) return [];
+    return products.filter(
+      (product) =>
+        (category === "all" || product.categoryTitle === category) &&
+        (collection === "all" || product.collectionTitle === collection),
+    );
+  }, [products, category, collection]);
+  const activeCollection = collections.find((item) => item.title === collection);
+  const categories = useMemo(() => Array.from(new Set(products.map((product) => product.categoryTitle))).filter(Boolean), [products]);
+
+  const heroProduct = homepageData?.heroProduct ?? null;
+  const featuredProducts = homepageData?.featuredProducts ?? [];
+  const homeCollections = homepageData?.homeCollections ?? [];
+  const newArrivalProducts = homepageData?.newArrivalProducts ?? [];
+  const trendingProducts = homepageData?.trendingProducts ?? [];
+  const editorialCollection = homepageData?.editorialCollection ?? null;
+  const archiveProducts = homepageData?.archiveProducts ?? [];
+  const curatedProducts = homepageData?.curatedProducts ?? [];
+  const queryResults = products.filter((product) =>
+    `${product.title} ${product.collectionTitle} ${product.categoryTitle}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
   );
-  const newArrivalProducts = productsByIds(products, getHomepageModule("newArrivals")?.productIds);
-  const trendingProducts = productsByIds(products, getHomepageModule("trending")?.productIds);
-  const editorialCollection = collections.find(
-    (item) => item.handle === getHomepageModule("editorial")?.collectionHandle,
-  );
-  const archiveProducts = productsByIds(
-    products,
-    getHomepageModule("archive")?.productIds ?? archiveProductIds,
-  );
-  const curatedProducts = productsByIds(products, getHomepageModule("curatedFit")?.productIds);
-  const queryResults = searchProducts(products, query);
-  const openAdd = (p: GlitchProduct) => {
+  const openAdd = (p: ProductModel) => {
     setSelected(p);
     setInventoryOpen(true);
   };
 
-  const ShopGrid = ({ items = filtered }: { items?: GlitchProduct[] }) => (
+  const ShopGrid = ({ items = filtered }: { items?: ProductModel[] }) => (
     <ProductGrid
       items={items}
       presentations={presentations}

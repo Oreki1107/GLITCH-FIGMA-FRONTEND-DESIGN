@@ -1,9 +1,9 @@
-import type { GlitchCollection, GlitchProduct } from '@/domain/types';
+import type { CollectionModel, ProductModel } from '@/domain/shared/models';
 
-export function selectCatalogCollections(collections: GlitchCollection[]) {
+export function selectCatalogCollections(collections: CollectionModel[]) {
   return collections;
 }
 
-export function selectCatalogProducts(products: GlitchProduct[]) {
+export function selectCatalogProducts(products: ProductModel[]) {
   return products;
 }
