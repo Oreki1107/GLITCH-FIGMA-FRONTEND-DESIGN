@@ -1,4 +1,4 @@
-import { catalogService } from '@/domain/catalog/services/catalog.service';
+import { catalogService } from '@/domain/catalog';
 import { homepageModuleConfig, HERO_IMAGE_URL, archiveProductIds } from '@/data/mock';
 import type { ProductModel, CollectionModel } from '@/domain/shared/models';
 

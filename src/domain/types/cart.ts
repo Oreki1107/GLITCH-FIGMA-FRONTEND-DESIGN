@@ -1,10 +1,10 @@
-export type GlitchCartLine = {
+export type GlychCartLine = {
   id: string;
   productId: string;
   size: string;
   quantity: number;
 };
 
-export type GlitchWishlistItem = {
+export type GlychWishlistItem = {
   productId: string;
 };

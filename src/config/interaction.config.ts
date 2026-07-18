@@ -6,8 +6,8 @@ export interface InteractionConfig {
 }
 
 export const interactionConfig: InteractionConfig = {
-  enableScrollDrivenEffects: false,
-  enableMagneticInteractions: false,
-  enableLongPress: false,
-  enableDragToCart: false,
+  enableScrollDrivenEffects: true,
+  enableMagneticInteractions: true,
+  enableLongPress: true,
+  enableDragToCart: true,
 };

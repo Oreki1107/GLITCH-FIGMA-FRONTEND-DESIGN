@@ -1,6 +1,6 @@
-Read glitch-blueprint.md completely before making any modifications.
+Read glych-blueprint.md completely before making any modifications.
 
-Treat the current prototype as Version 1 of the Glitch mobile ecommerce experience.
+Treat the current prototype as Version 1 of the Glych mobile ecommerce experience.
 
 The overall visual identity, typography direction, spacing philosophy, component language, and brand atmosphere have been approved.
 
@@ -357,6 +357,6 @@ Do not simplify.
 
 Do not introduce a different aesthetic.
 
-Preserve the existing Glitch identity while transforming Version 1 into a far more complete, polished, fully connected, production-quality prototype ready for the engineering phase.
+Preserve the existing Glych identity while transforming Version 1 into a far more complete, polished, fully connected, production-quality prototype ready for the engineering phase.
 
 The final deliverable should feel approximately 80–90% complete from a visual design and prototype perspective, leaving only advanced engineering (GSAP, Lenis, gesture systems, physics, interaction logic, animation systems, and performance optimization) for the next development stage.

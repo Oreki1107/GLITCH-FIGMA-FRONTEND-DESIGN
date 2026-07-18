@@ -1,4 +1,4 @@
-import type { Money } from './money';
+import type { Money } from '@/domain/types/money';
 
 export type ProductModel = {
   id: string;

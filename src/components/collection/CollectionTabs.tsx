@@ -2,7 +2,7 @@ import type { CollectionModel } from "@/domain/shared/models";
 import { SystemLabel } from "@/components/primitives";
 
 type CollectionTabsProps = {
-  collections: GlitchCollection[];
+  collections: GlychCollection[];
   activeCollection: string;
   onSelect: (collection: string) => void;
 };

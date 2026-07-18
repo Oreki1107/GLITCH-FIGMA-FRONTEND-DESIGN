@@ -23,7 +23,7 @@ export function filterProducts(
   products: ProductModel[],
   category: string,
   collection: string,
-): GlitchProduct[] {
+): GlychProduct[] {
   return products.filter(
     (product) =>
       (category === "all" || product.categoryTitle === category) &&

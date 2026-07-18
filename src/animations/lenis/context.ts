@@ -1,8 +1,11 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext } from "react";
+import type Lenis from "lenis";
 
 export interface LenisContextValue {
+  /** true once Lenis is initialized and attached to the GSAP ticker */
   ready: boolean;
-  registerInstance?: (id: string, instance: unknown) => void;
+  /** The Lenis instance — use for programmatic scroll control */
+  lenis?: Lenis;
 }
 
 const LenisContext = createContext<LenisContextValue>({ ready: false });

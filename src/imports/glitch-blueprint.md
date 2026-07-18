@@ -1,4 +1,4 @@
-# GLITCH — Design Engineering Blueprint
+# GLYCH — Design Engineering Blueprint
 ### A mobile-first, interaction-native shopping experience
 *This document supersedes all prior direction. It is a creative and interaction specification only — no tasks, no code, no roadmap. It is written to be handed directly to a product design team and, subsequently, to an engineering team implementing GSAP, Lenis, SplitType, and gesture tooling.*
 
@@ -6,9 +6,9 @@
 
 ## 1. Brand Identity
 
-**Glitch** is a streetwear label built on a single idea: *the moment something almost breaks is the most human moment a system has.* A glitch isn't a failure — it's the instant the machine's polish slips and something real shows through. The product is for people who move through cities like the feed is still loading around them: quick, alert, a half-step ahead of the rendering.
+**Glych** is a streetwear label built on a single idea: *the moment something almost breaks is the most human moment a system has.* A glych isn't a failure — it's the instant the machine's polish slips and something real shows through. The product is for people who move through cities like the feed is still loading around them: quick, alert, a half-step ahead of the rendering.
 
-Glitch does not sell "premium." It sells **presence** — the feeling of being early, being in on something, being the one who found the drop before it had a name.
+Glych does not sell "premium." It sells **presence** — the feeling of being early, being in on something, being the one who found the drop before it had a name.
 
 **Brand voice:** short, confident, a little cryptic. Never explains the joke. Talks like a group chat, not a catalogue. Copy is lowercase by default where it reads as attitude ("added to inventory"), capitalized only where it reads as a system label ("SIZE — SELECT").
 
@@ -24,9 +24,9 @@ The target feeling is not luxury calm — it is **alert delight**. Specifically,
 2. **Mischief** — interactions have a small element of surprise or play (a card that flinches when you get close, a product that has to be "caught").
 3. **Control** — despite the playfulness, every gesture resolves predictably. Physicality builds trust, not chaos.
 4. **Momentum** — nothing sits static; scrolling, dragging, and browsing all carry inertia, so motion never starts or stops abruptly.
-5. **Belonging** — the tone (copy, sound-adjacent haptics, glitch artifacts) signals "you get it," rewarding people already fluent in internet-native, streetwear-native culture.
+5. **Belonging** — the tone (copy, sound-adjacent haptics, glych artifacts) signals "you get it," rewarding people already fluent in internet-native, streetwear-native culture.
 
-Explicitly rejected feelings: prestige, hush, reverence, minimalism-as-restraint. Glitch is loud in confidence, not loud in clutter.
+Explicitly rejected feelings: prestige, hush, reverence, minimalism-as-restraint. Glych is loud in confidence, not loud in clutter.
 
 ---
 
@@ -65,7 +65,7 @@ Design rules for every interactive element:
 - **Objects have state memory.** A dragged card that's released mid-air should settle believably (spring-back or fall-through, contextually), never snap invisibly back to origin.
 - **Feedback is spatial, not just visual.** Success/failure/progress is communicated through position, scale, and rotation changes, reinforced (not replaced) by color/opacity changes.
 - **Proximity matters.** Elements should be aware of nearby touch/cursor position, not just direct contact — this is what makes the Inventory Pocket feel alive (see §12).
-- **Glitch artifacts are earned, not decorative.** Chromatic-aberration/RGB-split, scanline, and stutter-frame effects are reserved *exclusively* for feedback moments (success, drop confirmation, page-boundary transitions) — never ambient background noise. If glitch-as-texture appears everywhere, it stops meaning anything.
+- **Glych artifacts are earned, not decorative.** Chromatic-aberration/RGB-split, scanline, and stutter-frame effects are reserved *exclusively* for feedback moments (success, drop confirmation, page-boundary transitions) — never ambient background noise. If glych-as-texture appears everywhere, it stops meaning anything.
 
 ---
 
@@ -76,7 +76,7 @@ Design rules for every interactive element:
 - **Level 0 — Ambient / Idle.** The environment breathing when untouched: subtle drift on hero imagery, a slow idle "breath" scale on the Inventory Pocket, soft parallax on scroll. Always low-amplitude, always loopable, always the first thing disabled under reduced-motion.
 - **Level 1 — Responsive / Proximity.** Motion that reacts to the user being *near* something without touching it: a card tilting slightly toward a moving cursor, the Inventory Pocket waking as a dragged item approaches, nav elements compressing as thumb approaches the bottom zone.
 - **Level 2 — Direct Manipulation.** Motion that is a 1:1 physical response to active touch: drag-following, long-press card expansion, pinch/zoom on product imagery, pull-to-reveal filters. This layer must never lag behind the input — perceived latency here breaks the "physical object" illusion instantly.
-- **Level 3 — Resolution / Reward.** The payoff moment: absorption into the Inventory Pocket, the glitch-flash confirmation, a collection's entrance sequence, hero-to-PDP transition. These are the only moments allowed to use the full glitch visual vocabulary (RGB split, stutter-frame, flash-frame) at higher amplitude, because they are rare and earned.
+- **Level 3 — Resolution / Reward.** The payoff moment: absorption into the Inventory Pocket, the glych-flash confirmation, a collection's entrance sequence, hero-to-PDP transition. These are the only moments allowed to use the full glych visual vocabulary (RGB split, stutter-frame, flash-frame) at higher amplitude, because they are rare and earned.
 
 **Governing rule:** amplitude and visual noise scale *up* from Level 0 to Level 3. Nothing at Level 0 or 1 should ever be louder than something at Level 3 — this preserves "alive, not noisy."
 
@@ -88,7 +88,7 @@ Design rules for every interactive element:
 - **Density is a storytelling tool.** A drop-focused collection (one hero item, few SKUs) uses a sparse, oversized, almost-empty layout. A general collection uses tighter, denser rhythm. Density itself communicates what kind of collection the user is in — before they read a word.
 - **Controlled asymmetry over symmetry.** Every major layout has at least one deliberately off-balance element (a card breaking the row height, a headline overlapping imagery, a product bleeding off-screen at one edge) to keep the composition feeling shot, not assembled.
 - **Cropping is intentional, not accidental.** Hero and lifestyle imagery is frequently cropped tight/off-center in a way that implies movement continuing beyond the frame — nothing feels like a centered product photo on a white seamless.
-- **Environments, not templates.** Each collection should feel like walking into a different physical space — different composition rhythm, different dominant color temperature drawn from its own photography, different card density — while remaining unmistakably Glitch underneath (shared type system, shared motion physics, shared Inventory Pocket).
+- **Environments, not templates.** Each collection should feel like walking into a different physical space — different composition rhythm, different dominant color temperature drawn from its own photography, different card density — while remaining unmistakably Glych underneath (shared type system, shared motion physics, shared Inventory Pocket).
 
 ---
 
@@ -100,7 +100,7 @@ Bold, confident, modern, technical. Streetwear-signal, not editorial-luxury-sign
 - **Body:** a clean, high-legibility grotesque (register of Suisse Int'l / Neue Haas Grotesk) kept small and quiet so the display type and photography carry all the visual weight.
 - **Utility/system:** a monospace face (register of Space Mono / PP Neue Montreal Mono) used for all "system" data — SKU, price, stock count, size grid, timestamps — reinforcing the idea that the interface is a live system, not a brochure.
 - **Hierarchy through scale jumps, not weight subtlety.** Headline-to-body scale ratio should feel aggressive (large jumps), never a gentle editorial step-down.
-- **Type as texture.** Oversized headline type is allowed to bleed off-screen, sit behind product imagery at low opacity, or intentionally misregister (a Level-3 glitch moment: a headline briefly RGB-splits on scroll-trigger, then resolves).
+- **Type as texture.** Oversized headline type is allowed to bleed off-screen, sit behind product imagery at low opacity, or intentionally misregister (a Level-3 glych moment: a headline briefly RGB-splits on scroll-trigger, then resolves).
 
 ---
 
@@ -163,7 +163,7 @@ The cart is not a cart. It is the **Inventory Pocket** — a permanent, lower-ri
 
 **Wake (Level 1):** as a dragged product enters its proximity radius, the Pocket visibly wakes — brightens, scales slightly, and exerts a gentle magnetic pull that subtly nudges the dragged card's trajectory toward it as it gets close (an assist, not an auto-snap from a distance — the user must still choose to release near it).
 
-**Absorption (Level 3, the signature reward moment):** on release near/over the Pocket, the product card doesn't simply disappear into an icon. It compresses toward the Pocket's center with an accelerating motion, accompanied by a brief, contained glitch-flash (RGB-split micro-frame + stutter) exactly at the moment of contact — the interface's most concentrated visual reward, reserved for this and equivalent Level-3 moments only.
+**Absorption (Level 3, the signature reward moment):** on release near/over the Pocket, the product card doesn't simply disappear into an icon. It compresses toward the Pocket's center with an accelerating motion, accompanied by a brief, contained glych-flash (RGB-split micro-frame + stutter) exactly at the moment of contact — the interface's most concentrated visual reward, reserved for this and equivalent Level-3 moments only.
 
 **Configuration panel:** absorption does *not* immediately finalize the add. A compact floating panel surfaces adjacent to the Pocket (not a full-screen modal, not a separate page) requesting:
 - size
@@ -202,7 +202,7 @@ The homepage hero establishes the entire brand in one cinematic, interactive mom
 - **Fast, keyboard/touch-first, and physical in feel** — not a static list of text results. Result entries inherit card physicality at a reduced scale (subtle idle motion, tap-to-preview via a lighter version of the long-press peek).
 - **Instant, incremental filtering** as the user types — no loading spinners; results should feel like they're already there and simply narrowing, reinforcing the "alive system" feeling.
 - **Discovery-oriented empty/pre-query state:** trending and recently-viewed items are shown as soon as search opens, so the surface is never blank — search is a browsing tool, not just a lookup tool.
-- **Glitch-flash micro-moment** (Level 3, minimal amplitude) on a successful "exact match" result appearing, tying the reward vocabulary back into even a small utility moment.
+- **Glych-flash micro-moment** (Level 3, minimal amplitude) on a successful "exact match" result appearing, tying the reward vocabulary back into even a small utility moment.
 
 ---
 
@@ -242,7 +242,7 @@ No gesture is ever overloaded with two different meanings across different compo
 - **Buttons/primary actions:** press-in physical depression (scale + shadow compression) on touch-down, confident release-bounce on touch-up — never a flat color-swap-only state change.
 - **Toggles/filters:** treated as physical switches with a snap-point, not fade-only active/inactive states.
 - **Form fields (checkout, contact):** kept low-friction and fast — minimal physicality here deliberately, since this is where the brief calls for speed over play.
-- **Loading/transition states:** never a generic spinner. Use a brief, contained glitch-frame (stutter + RGB-split, sub-300ms) as the universal "system is thinking" signal, tying utility feedback back into brand language.
+- **Loading/transition states:** never a generic spinner. Use a brief, contained glych-frame (stutter + RGB-split, sub-300ms) as the universal "system is thinking" signal, tying utility feedback back into brand language.
 - **Empty states (empty search, empty Inventory Pocket):** treated as an invitation, illustrated/animated with the same idle-breathing Level-0 motion language as everything else, never a flat "no items" text block.
 
 ---
@@ -256,9 +256,9 @@ Thought of as **interaction systems layered under a thin route structure**, not 
 - **Product Detail** — the configuration system + gallery-gesture system, entered via shared-element transition from any card or the hero.
 - **Search** — the instant-filter system, globally accessible from the persistent bottom zone.
 - **Inventory Pocket** — not a page but a persistent, always-mounted system, with an expandable full view for review/checkout handoff.
-- **Account / Order history** — deliberately the lowest-personality zone: fast, clear, minimal glitch vocabulary, because utility trust matters most here.
+- **Account / Order history** — deliberately the lowest-personality zone: fast, clear, minimal glych vocabulary, because utility trust matters most here.
 
-Global/persistent layer (mounted once, never remounted by navigation): nav trigger, search trigger, Inventory Pocket, glitch-transition overlay.
+Global/persistent layer (mounted once, never remounted by navigation): nav trigger, search trigger, Inventory Pocket, glych-transition overlay.
 
 ---
 
@@ -270,7 +270,7 @@ Reusable interaction-system components (defined by behavior, not visual template
 - **Inventory Pocket** — singleton, persistent, with idle/wake/absorb/configure states as defined in §12.
 - **Configuration Panel** — shared between Inventory Pocket add-flow and PDP configuration, reinforcing one mental model.
 - **Shared-Element Transporter** — the system responsible for every hero-to-PDP, card-to-PDP, and category-to-collection continuity transition.
-- **Glitch-Feedback Layer** — a global, centrally-controlled effect system (RGB-split, stutter-frame, flash) that any component can request but which enforces the Level-3-only usage rule, preventing overuse.
+- **Glych-Feedback Layer** — a global, centrally-controlled effect system (RGB-split, stutter-frame, flash) that any component can request but which enforces the Level-3-only usage rule, preventing overuse.
 - **Fullscreen Nav Takeover** — swipeable, gesture-driven, imagery-led section switcher.
 - **Draggable Strip** — the inertia-scroll component underlying related products, colorway selection, and any horizontal siblings-browsing moment.
 
@@ -279,7 +279,7 @@ Reusable interaction-system components (defined by behavior, not visual template
 ## 21. Visual Language
 
 - **Base mood:** dark, cool, electric — a near-black void punctuated by a single high-signal accent color, evoking a screen glowing in a dark room rather than a boutique showroom.
-- **Glitch as controlled malfunction, not chaos:** RGB channel-split, scanline flicker, and stutter-frame are the brand's signature visual texture, but are rationed strictly to Level-3 reward moments (§6) and occasional Level-1 proximity hints at very low amplitude — never ambient background noise, never applied to body text or utility UI.
+- **Glych as controlled malfunction, not chaos:** RGB channel-split, scanline flicker, and stutter-frame are the brand's signature visual texture, but are rationed strictly to Level-3 reward moments (§6) and occasional Level-1 proximity hints at very low amplitude — never ambient background noise, never applied to body text or utility UI.
 - **Hard edges, sharp corners** on system/utility elements (buttons, chips, config panels) — softness is reserved for photography and card motion physics, not geometry.
 - **Layering over decoration:** depth communicated through real z-axis layering (imagery behind type, cards lifting on interaction) rather than drop-shadows-as-decoration.
 
@@ -291,14 +291,14 @@ Reusable interaction-system components (defined by behavior, not visual template
 | `--color-static` | `#EDEDED` | Primary text / foreground |
 | `--color-graphite` | `#1C1C1F` | Elevated surface (cards, panels) |
 | `--color-signal` | `#C6FF3D` | Primary accent — "online," active, confirmed states |
-| `--color-glitch-red` | `#FF2E4D` | Feedback-only — RGB-split red channel |
-| `--color-glitch-cyan` | `#2EF2FF` | Feedback-only — RGB-split cyan channel |
+| `--color-glych-red` | `#FF2E4D` | Feedback-only — RGB-split red channel |
+| `--color-glych-cyan` | `#2EF2FF` | Feedback-only — RGB-split cyan channel |
 | `--color-line` | `rgba(237,237,237,0.08)` | Hairline separators, used sparingly |
 | Display typeface | Neue Machina / Cash / ABC Monument Grotesk Wide register | Oversized headline, technical streetwear register |
 | Body typeface | Suisse Int'l / Neue Haas Grotesk register | Quiet, legible, never competes with imagery |
 | System/mono typeface | Space Mono / PP Neue Montreal Mono register | Price, SKU, size grid, timestamps, configuration data |
 | Motion easing (organic/inertia) | spring-based (mass/tension/friction), not fixed-duration | Cards, drag, Inventory Pocket |
-| Motion easing (system feedback) | fast expo-out, sub-300ms | Button press, toggle snap, glitch-flash |
+| Motion easing (system feedback) | fast expo-out, sub-300ms | Button press, toggle snap, glych-flash |
 
 ---
 
@@ -315,10 +315,10 @@ Mobile is the design. Larger viewports **expand the same interaction systems**, 
 
 ## 23. Accessibility Philosophy
 
-Physicality and glitch aesthetics must never become barriers:
+Physicality and glych aesthetics must never become barriers:
 
 - **Every gesture has a non-gesture equivalent.** Long-press-to-peek, drag-to-cart, and swipe-to-navigate all have a keyboard/switch/screen-reader-operable equivalent path (e.g., a focusable "Add to Inventory" action that opens the same configuration panel without requiring a drag).
-- **Glitch-Feedback Layer effects are motion-sensitive by design.** Under `prefers-reduced-motion`, Level-3 RGB-split/stutter effects are replaced with a simple, calm confirmation (color/opacity change only) — the *meaning* of the feedback is preserved, the visual intensity is not.
+- **Glych-Feedback Layer effects are motion-sensitive by design.** Under `prefers-reduced-motion`, Level-3 RGB-split/stutter effects are replaced with a simple, calm confirmation (color/opacity change only) — the *meaning* of the feedback is preserved, the visual intensity is not.
 - **Idle/ambient (Level 0) motion is the first thing disabled** under reduced-motion, since it's the least meaningful and most easily perceived as "distracting."
 - **Contrast:** `--color-static` on `--color-void` and `--color-signal` usage on dark surfaces must be verified at AA minimum for all text-carrying uses; `--color-signal` as a small accent/icon does not need to meet text-contrast rules but must never be the sole carrier of critical information (paired with icon/shape/position redundancy).
 - **Focus states are real and visible**, styled in the system/mono visual register (not suppressed for aesthetic reasons) — a keyboard user should be able to perceive exactly which "physical object" is currently selected.
@@ -331,7 +331,7 @@ Physicality and glitch aesthetics must never become barriers:
 
 - The **Shared-Element Transporter** (§20) and **Inventory Pocket** are the two systems with the highest interaction complexity and should be prototyped/validated first, since nearly every other system (cards, hero, collections, search) depends on their physics feeling correct before being layered on top.
 - **Drag physics must feel mass-based** (spring/inertia simulation), not a fixed-duration tween following the pointer — this is the single most important technical bar for the entire brief, since the "physical object, not HTML element" illusion collapses instantly if drag has perceptible input lag or a linear/robotic follow curve.
-- **The Glitch-Feedback Layer should be a single centrally-owned effect system**, not a per-component implementation, both so its Level-3-only usage rule can be enforced structurally and so its reduced-motion fallback can be defined once and inherited everywhere.
+- **The Glych-Feedback Layer should be a single centrally-owned effect system**, not a per-component implementation, both so its Level-3-only usage rule can be enforced structurally and so its reduced-motion fallback can be defined once and inherited everywhere.
 - **Proximity-based (Level 1) triggers** need a lightweight, performant way to know "is a draggable object near this element" without expensive per-frame collision checks across the whole viewport — engineering should scope this carefully given the number of cards that could be on-screen simultaneously.
 - **Onboarding-once state** (hero drag-to-cart guide) needs a persisted "seen" flag scoped per visitor, not per session, so the guide genuinely never reappears.
 - Nothing in this document assumes a specific animation library, gesture library, or framework — GSAP/Lenis/SplitType/gesture-library selection and architecture are entirely the next stage's responsibility.
@@ -340,4 +340,4 @@ Physicality and glitch aesthetics must never become barriers:
 
 ## Differentiation Callout
 
-*This blueprint avoids a generic streetwear-site feel by making the cart itself the site's signature interaction (the Inventory Pocket's wake → absorb → configure sequence) and by rationing the glitch visual vocabulary to a strict Level-3-only reward system — rather than scattering glitch effects decoratively across the whole interface, which would read as a filter, not a personality.*
+*This blueprint avoids a generic streetwear-site feel by making the cart itself the site's signature interaction (the Inventory Pocket's wake → absorb → configure sequence) and by rationing the glych visual vocabulary to a strict Level-3-only reward system — rather than scattering glych effects decoratively across the whole interface, which would read as a filter, not a personality.*

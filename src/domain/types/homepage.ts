@@ -1,36 +1,36 @@
-import type { GlitchCollection } from "./collection";
-import type { GlitchProduct } from "./product";
+import type { GlychCollection } from "./collection";
+import type { GlychProduct } from "./product";
 import type { ProductPresentation } from "./presentation";
 
-export type GlitchHomeModule =
+export type GlychHomeModule =
   | {
       id: string;
       type: "hero";
       heroImageUrl: string;
-      product: GlitchProduct | null;
+      product: GlychProduct | null;
     }
   | {
       id: string;
       type: "featuredProducts";
-      products: GlitchProduct[];
+      products: GlychProduct[];
       presentations: ProductPresentation[];
     }
   | {
       id: string;
       type: "collectionPreview";
-      collections: GlitchCollection[];
+      collections: GlychCollection[];
     }
   | {
       id: string;
       type: "newArrivals";
-      products: GlitchProduct[];
+      products: GlychProduct[];
       presentations: ProductPresentation[];
       totalProductCount: number;
     }
   | {
       id: string;
       type: "trending";
-      products: GlitchProduct[];
+      products: GlychProduct[];
     }
   | {
       id: string;
@@ -40,17 +40,17 @@ export type GlitchHomeModule =
   | {
       id: string;
       type: "editorial";
-      collection: GlitchCollection;
+      collection: GlychCollection;
     }
   | {
       id: string;
       type: "archive";
-      products: GlitchProduct[];
+      products: GlychProduct[];
     }
   | {
       id: string;
       type: "curatedFit";
-      products: GlitchProduct[];
+      products: GlychProduct[];
       presentations: ProductPresentation[];
       defaultCategoryHandle: string | null;
     }

@@ -1,8 +1,8 @@
-Read glitch-blueprint.md completely before making any modifications.
+Read glych-blueprint.md completely before making any modifications.
 
 Treat the blueprint as the single source of truth.
 
-The current prototype has successfully established the visual identity of Glitch.
+The current prototype has successfully established the visual identity of Glych.
 
 The typography, overall visual language, spacing philosophy, component style, and mobile-first direction have been approved.
 
@@ -438,4 +438,4 @@ Do not simplify the experience.
 
 Instead, transform the current prototype into a scalable, data-driven, Shopify-ready frontend foundation that can gracefully support both a startup fashion brand with very few products and a mature fashion brand with hundreds of products without requiring future layout redesigns.
 
-Preserve the approved Glitch identity while eliminating hardcoded assumptions, improving navigation, strengthening product discovery, and making every major UI pattern reusable and adaptable for future Shopify integration.
+Preserve the approved Glych identity while eliminating hardcoded assumptions, improving navigation, strengthening product discovery, and making every major UI pattern reusable and adaptable for future Shopify integration.

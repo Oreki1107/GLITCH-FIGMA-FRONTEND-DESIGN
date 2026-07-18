@@ -1,15 +1,2 @@
-export type View =
-  | "home"
-  | "shop"
-  | "collections"
-  | "archive"
-  | "wishlist"
-  | "cart"
-  | "profile"
-  | "product"
-  | "search";
-
-export type CatalogFilters = {
-  category: string;
-  collection: string;
-};
+// Re-export canonical definitions from shared models with backwards-compatible aliases
+export type { ViewModel as View, CatalogFiltersModel as CatalogFilters } from "../shared/models";

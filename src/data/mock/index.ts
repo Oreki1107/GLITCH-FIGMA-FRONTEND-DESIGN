@@ -7,11 +7,6 @@ export {
   archiveProductIds,
   type HomepageModuleConfig,
 } from "./homepage-modules.config";
-export {
-  productsByIds,
-  collectionsByHandles,
-  deriveCategories,
-  filterProducts,
-  searchProducts,
-} from "./catalog.helpers";
-export { getHomepageModule } from "./homepage.helpers";
+// Note: catalog.helpers functions are unused and duplicated in repositories
+// They are kept in the file for reference but not exported
+// Future consolidation: delete catalog.helpers.ts entirely

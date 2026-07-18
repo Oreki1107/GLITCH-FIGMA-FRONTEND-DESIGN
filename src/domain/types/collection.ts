@@ -1,9 +1,2 @@
-export type GlitchCollection = {
-  id: string;
-  handle: string;
-  title: string;
-  number: string;
-  imageUrl: string;
-  copy: string;
-  accentColor: string;
-};
+// Re-export canonical definition from shared models
+export type { CollectionModel as GlychCollection } from "../shared/models";

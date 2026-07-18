@@ -1,3 +1,108 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+/* ─────────────────────────────────────────────────────────────
+   GPU Acceleration Utilities
+   Applied to elements that will animate via GSAP transforms.
+   Creates compositor layer upfront — avoids layout recalculation
+   on first animation frame.
+───────────────────────────────────────────────────────────── */
+@layer utilities {
+  .will-animate {
+    will-change: transform, opacity;
+  }
+
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+
+  /* Applied to image containers that participate in parallax */
+  .parallax-layer {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  /* Overlay containers — pre-optimized for transform animations */
+  .overlay-layer {
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Prefers-Reduced-Motion
+   GSAP globalTimeline.timeScale(0) handles most animations,
+   but CSS transitions need separate override to stay accessible.
+   These rules collapse transition durations to instant.
+───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Scroll Behavior
+   Lenis overrides native scroll. Set scroll-behavior: auto on html
+   so Lenis has full control without browser interference.
+───────────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Custom Scrollbar
+   Minimal, brand-native scrollbar styling for desktop.
+   Matches GLITCH dark aesthetic — thin, primary accent thumb.
+───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(198, 255, 61, 0.35);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(198, 255, 61, 0.65);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Image Rendering
+   Prevent blurring on scaled images during hover animations.
+───────────────────────────────────────────────────────────── */
+img {
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Focus Ring Reset
+   Radix UI and custom buttons use custom focus-visible rings.
+   Remove default browser outlines that conflict.
+───────────────────────────────────────────────────────────── */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Lottie Color System */
+.lottie-color-accent svg *[stroke]:not([stroke="none"]) { stroke: var(--primary) !important; }
+.lottie-color-accent svg *[fill]:not([fill="none"]) { fill: var(--primary) !important; }
+.lottie-color-monochrome svg *[stroke]:not([stroke="none"]) { stroke: currentColor !important; }
+.lottie-color-monochrome svg *[fill]:not([fill="none"]) { fill: currentColor !important; }
+

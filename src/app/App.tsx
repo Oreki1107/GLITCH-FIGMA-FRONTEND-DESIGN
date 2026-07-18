@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense } from "react";
+import { useGSAP } from "@gsap/react";
+import { gsap } from "gsap";
 import {
   ArrowDownRight,
   ArrowLeft,
@@ -21,11 +24,19 @@ import {
   presentationMap,
   getPresentation,
 } from "@/data/mock";
-import { catalogService } from "@/domain/catalog/services/catalog.service";
-import { homepageRuntimeService, type HomepageRuntimeData } from "@/domain/homepage/services/homepage-runtime.service";
+import { catalogService, selectFilteredProducts, selectAvailableCategories, selectProductsBySearchQuery, selectCollectionByTitle } from "@/domain/catalog";
+import { homepageRuntimeService, type HomepageRuntimeData } from "@/domain/homepage";
 import { SystemLabel, SectionHeading, BottomControl } from "@/components/primitives";
+import { SearchOverlay } from "./components/search/SearchOverlay";
+import { Story } from "./components/story/Story";
+import { Contact } from "./components/contact/Contact";
+import { GlychText, FingerGestureAnimation, BagArrowAnimation } from "@/components/motion";
 import { ProductCard, ProductGrid } from "@/components/product";
 import { CollectionTabs } from "@/components/collection";
+import { HomepageRuntime } from "@/app/components/homepage/HomepageRuntime";
+import { enterPage, exitPage } from "@/animations/gsap/timelines/pageTransitionAnimations";
+import { slideUpOverlay, slideDownOverlay, fadeScaleOverlay, fadeScaleOut } from "@/animations/gsap/timelines/interactionAnimations";
+import { siteConfig } from "@/config/site.config";
 
 const presentations = presentationMap(mockProductPresentations);
 
@@ -45,33 +56,112 @@ function App() {
   const [quantity, setQuantity] = useState(1);
   const [size, setSize] = useState("M");
 
-  const go = (next: ViewModel) => {
-    if (next !== view) setRouteHistory((items) => [...items, view].slice(-16));
-    setView(next);
-    setNavOpen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-  const back = () => {
-    setRouteHistory((items) => {
-      const previous = items.at(-1) ?? "home";
-      setView(previous);
+  // ─── Animation refs ────────────────────────────────────────────────────────
+  /** Wrapper around the active view content — used for enter/exit transitions */
+  const viewContainerRef = useRef<HTMLDivElement>(null);
+  /** Running transition timeline — killed before new one starts (interruptible) */
+  const transitionRef = useRef<gsap.core.Timeline | null>(null);
+  /** Inventory overlay element — always mounted, animated in/out */
+  const inventoryOverlayRef = useRef<HTMLDivElement>(null);
+  /** Nav overlay element — always mounted, animated in/out */
+  const navOverlayRef = useRef<HTMLDivElement>(null);
+  /** Cart button in bottom bar — animated on item add */
+  const cartButtonRef = useRef<HTMLButtonElement>(null);
+  /** Heart icon in ProductDetail — animated on wishlist toggle */
+  const heartIconRef = useRef<SVGSVGElement>(null);
+
+  // ─── Animated navigation ───────────────────────────────────────────────────
+  const go = useCallback((next: ViewModel) => {
+    if (next === view) return;
+
+    // Kill any in-progress transition
+    transitionRef.current?.kill();
+
+    const doNavigate = () => {
+      setRouteHistory((items) => [...items, view].slice(-16));
+      setView(next);
       setNavOpen(false);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return items.slice(0, -1);
-    });
-  };
+      // Use instant scroll — Lenis manages smooth scroll, 'smooth' behavior
+      // conflicts with Lenis and causes visible jank on view swap.
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    };
+
+    if (viewContainerRef.current) {
+      // Exit current view, then navigate
+      transitionRef.current = exitPage(viewContainerRef.current);
+      transitionRef.current.then(doNavigate);
+    } else {
+      doNavigate();
+    }
+  }, [view]);
+
+  const back = useCallback(() => {
+    // Kill any in-progress transition
+    transitionRef.current?.kill();
+
+    const doBack = () => {
+      setRouteHistory((items) => {
+        const previous = items.at(-1) ?? "home";
+        setView(previous);
+        setNavOpen(false);
+        window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+        return items.slice(0, -1);
+      });
+    };
+
+    if (viewContainerRef.current) {
+      transitionRef.current = exitPage(viewContainerRef.current);
+      transitionRef.current.then(doBack);
+    } else {
+      doBack();
+    }
+  }, []);
+
+  // Run enter animation whenever the view state changes
+  useEffect(() => {
+    if (viewContainerRef.current) {
+      transitionRef.current?.kill();
+      transitionRef.current = enterPage(viewContainerRef.current);
+    }
+  }, [view]);
+
+  // ─── Product / cart / wishlist actions ────────────────────────────────────
   const openProduct = (p: ProductModel) => {
     setSelected(p);
     setRecentlyViewed((items) => [p, ...items.filter((item) => item.id !== p.id)].slice(0, 4));
     go("product");
   };
+
   const addItem = (p = selected) => {
+    if (!p) return;
     setCart((items) => [...items, ...Array(quantity).fill(p)]);
     setInventoryOpen(false);
     setQuantity(1);
+    // Cart button pulse — communicates the item was received
+    if (cartButtonRef.current) {
+      gsap.fromTo(
+        cartButtonRef.current,
+        { scale: 1 },
+        { scale: 1.1, duration: 0.12, ease: "power2.out",
+          yoyo: true, repeat: 1, repeatDelay: 0.04 },
+      );
+    }
   };
-  const toggleWish = (id: string) =>
-    setWishlist((items) => (items.includes(id) ? items.filter((item) => item !== id) : [...items, id]));
+
+  const toggleWish = (id: string) => {
+    const isAdding = !wishlist.includes(id);
+    setWishlist((items) =>
+      isAdding ? [...items, id] : items.filter((item) => item !== id)
+    );
+    // Heart spring animation when adding to wishlist
+    if (isAdding && heartIconRef.current) {
+      gsap.fromTo(
+        heartIconRef.current,
+        { scale: 0.6 },
+        { scale: 1, duration: 0.45, ease: "elastic.out(1.3, 0.4)" },
+      );
+    }
+  };
 
   const [products, setProducts] = useState<ProductModel[]>([]);
   const [collections, setCollections] = useState<CollectionModel[]>([]);
@@ -104,15 +194,11 @@ function App() {
   }, []);
 
   const filtered = useMemo(() => {
-    if (!products.length) return [];
-    return products.filter(
-      (product) =>
-        (category === "all" || product.categoryTitle === category) &&
-        (collection === "all" || product.collectionTitle === collection),
-    );
+    return selectFilteredProducts(products, { category, collection });
   }, [products, category, collection]);
-  const activeCollection = collections.find((item) => item.title === collection);
-  const categories = useMemo(() => Array.from(new Set(products.map((product) => product.categoryTitle))).filter(Boolean), [products]);
+  const activeCollection = selectCollectionByTitle(collections, collection);
+  const categories = useMemo(() => selectAvailableCategories(products), [products]);
+  const activeProduct = selected ?? products[0] ?? null;
 
   const heroProduct = homepageData?.heroProduct ?? null;
   const featuredProducts = homepageData?.featuredProducts ?? [];
@@ -122,11 +208,7 @@ function App() {
   const editorialCollection = homepageData?.editorialCollection ?? null;
   const archiveProducts = homepageData?.archiveProducts ?? [];
   const curatedProducts = homepageData?.curatedProducts ?? [];
-  const queryResults = products.filter((product) =>
-    `${product.title} ${product.collectionTitle} ${product.categoryTitle}`
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  );
+  const queryResults = useMemo(() => selectProductsBySearchQuery(products, query), [products, query]);
   const openAdd = (p: ProductModel) => {
     setSelected(p);
     setInventoryOpen(true);
@@ -138,389 +220,41 @@ function App() {
       presentations={presentations}
       onOpen={openProduct}
       expandedIndex={view === "shop" ? 0 : null}
+      onWishlistToggle={toggleWish}
+      onQuickAdd={openAdd}
+      isWishlisted={(id) => wishlist.includes(id)}
     />
   );
 
   const Home = () => (
-    <>
-      <section className="relative min-h-[90svh] overflow-hidden bg-[#0f1214]">
-        <img
-          src={HERO_IMAGE_URL}
-          alt="Model wearing the new Glitch collection at night"
-          className="absolute inset-0 size-full object-cover object-[58%_center] opacity-75"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(10,10,12,.75),transparent_65%),linear-gradient(0deg,rgba(10,10,12,.95),transparent_36%)]" />
-        <div className="relative flex min-h-[90svh] flex-col justify-end px-4 pb-28 pt-24 md:px-8 md:pb-24">
-          <SystemLabel className="mb-4 text-primary">
-            drop / {heroProduct?.collectionTitle ?? "current release"}
-          </SystemLabel>
-          <h1 className="max-w-4xl font-['Archivo_Black'] text-[clamp(4.5rem,15vw,12rem)] leading-[.78] tracking-[-.09em]">
-            DON&apos;T
-            <br />
-            <span className="ml-[8vw] text-transparent [-webkit-text-stroke:1px_#ededed]">STAND</span>
-            <br />
-            STILL.
-          </h1>
-          <div className="mt-8 flex items-end justify-between gap-6 md:ml-[33vw] md:max-w-md">
-            <p className="max-w-[190px] text-xs leading-5 text-white/65">
-              the city keeps loading. wear something that catches up.
-            </p>
-            {heroProduct && (
-              <button
-                onClick={() => openAdd(heroProduct)}
-                className="group flex items-center gap-2 border-b border-primary pb-2 text-primary"
-              >
-                <SystemLabel>drag to cart</SystemLabel>
-                <ArrowDownRight size={16} />
-              </button>
-            )}
-          </div>
-        </div>
-        {heroProduct && (
-          <button
-            onClick={() => openProduct(heroProduct)}
-            className="absolute right-4 top-[26%] flex items-center gap-2 border border-white/20 bg-black/30 px-3 py-2 backdrop-blur-sm md:right-8"
-          >
-            <span className="size-2 bg-primary" />
-            <SystemLabel>
-              {heroProduct.title} / {heroProduct.price.formatted}
-            </SystemLabel>
-          </button>
-        )}
-      </section>
-      {featuredProducts.length > 0 && (
-        <section className="px-4 py-20 md:px-8 md:py-32">
-          <SectionHeading
-            kicker="objects in range"
-            title="pick a signal."
-            action={
-              <button onClick={() => go("shop")} className="hidden items-center gap-1 md:flex">
-                <SystemLabel>shop all</SystemLabel>
-                <ArrowRight size={14} />
-              </button>
-            }
-          />
-          <ShopGrid items={featuredProducts} />
-          <button
-            onClick={() => go("shop")}
-            className="mt-2 flex w-full items-center justify-between border-y border-border py-5 md:hidden"
-          >
-            <SystemLabel>shop all objects</SystemLabel>
-            <ArrowRight size={16} />
-          </button>
-        </section>
-      )}
-      {homeCollections.length > 0 && (
-        <section className="overflow-hidden border-y border-border bg-[#16161a] px-4 py-16 md:px-8 md:py-24">
-          <div className="mb-10 flex items-end justify-between">
-            <div>
-              <SystemLabel className="text-primary">three rooms / one signal</SystemLabel>
-              <h2 className="mt-2 font-['Archivo_Black'] text-5xl lowercase leading-[.86] tracking-[-.08em] md:text-7xl">
-                move through it.
-              </h2>
-            </div>
-            <button onClick={() => go("collections")}>
-              <SystemLabel>all collections</SystemLabel>
-            </button>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {homeCollections.map((item, i) => (
-              <button
-                key={item.title}
-                onClick={() => {
-                  setCollection(item.title);
-                  go("collections");
-                }}
-                className={`group relative min-h-72 overflow-hidden text-left ${i % 3 === 1 ? "md:mt-16" : ""}`}
-              >
-                <img
-                  src={item.imageUrl}
-                  alt={item.title}
-                  className="absolute inset-0 size-full object-cover opacity-75 transition duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 to-transparent" />
-                <div className="absolute bottom-4 left-4">
-                  <SystemLabel style={{ color: item.accentColor } as React.CSSProperties}>
-                    {item.number} / collection
-                  </SystemLabel>
-                  <h3 className="mt-1 font-['Archivo_Black'] text-3xl lowercase tracking-[-.06em]">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 max-w-[220px] text-xs text-white/65">{item.copy}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-      {newArrivalProducts.length > 0 && (
-        <section className="bg-[#101014] px-4 py-20 md:px-8 md:py-32">
-          <SectionHeading
-            kicker="recently dropped"
-            title={
-              <>
-                too new
-                <br />
-                for context.
-              </>
-            }
-            action={<SystemLabel>{products.length} objects</SystemLabel>}
-          />
-          <div className="flex gap-3 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none]">
-            {newArrivalProducts.slice(strip, strip + 3).map((item) => (
-              <div key={item.id} className="w-[64vw] shrink-0 sm:w-64 lg:w-72">
-                <ProductCard
-                  product={item}
-                  presentation={getPresentation(presentations, item.id)}
-                  compact
-                  onOpen={() => openProduct(item)}
-                />
-              </div>
-            ))}
-          </div>
-          <div className="mt-5 flex justify-end gap-1">
-            <button
-              onClick={() => setStrip(Math.max(0, strip - 1))}
-              aria-label="Previous products"
-              className="grid size-10 place-items-center border border-white/20 disabled:opacity-30"
-              disabled={strip === 0}
-            >
-              <ChevronLeft size={17} />
-            </button>
-            <button
-              onClick={() => setStrip(Math.min(newArrivalProducts.length - 3, strip + 1))}
-              aria-label="Next products"
-              className="grid size-10 place-items-center border border-white/20 disabled:opacity-30"
-              disabled={strip >= newArrivalProducts.length - 3}
-            >
-              <ChevronRight size={17} />
-            </button>
-          </div>
-        </section>
-      )}
-      <section className="border-y border-border bg-[#0d0d10] px-4 py-20 md:px-8 md:py-28">
-        {trendingProducts.length > 0 && (
-          <SectionHeading
-            kicker="trending / picked up fast"
-            title={
-              <>
-                moving
-                <br />
-                through it.
-              </>
-            }
-            action={
-              <button onClick={() => go("shop")} className="flex items-center gap-1">
-                <SystemLabel>view all</SystemLabel>
-                <ArrowRight size={14} />
-              </button>
-            }
-          />
-        )}
-        <div className="divide-y divide-border border-y border-border">
-          {trendingProducts.map((item, i) => (
-            <button
-              key={item.id}
-              onClick={() => openProduct(item)}
-              className="group grid w-full grid-cols-[30px_72px_1fr_auto] items-center gap-3 py-3 text-left md:grid-cols-[44px_120px_1fr_auto] md:gap-6 md:py-4"
-            >
-              <SystemLabel className="text-primary">0{i + 1}</SystemLabel>
-              <div className="aspect-square overflow-hidden bg-card">
-                <img
-                  src={item.imageUrl}
-                  alt={item.title}
-                  className="size-full object-cover grayscale-[20%] transition duration-500 group-hover:scale-105"
-                />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold lowercase tracking-[-.02em] md:text-base">{item.title}</h3>
-                <SystemLabel className="text-muted-foreground">
-                  {item.tag} / {item.collectionTitle}
-                </SystemLabel>
-              </div>
-              <div className="flex items-center gap-3">
-                <SystemLabel>{item.price.formatted}</SystemLabel>
-                <ArrowUpRight size={15} className="text-primary" />
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-      <section className="px-4 py-20 md:px-8 md:py-32">
-        {categories.length > 0 && (
-          <div className="grid gap-9 md:grid-cols-[.72fr_1.28fr] md:items-end">
-            <div>
-              <SystemLabel className="text-primary">category / enter by feeling</SystemLabel>
-              <h2 className="mt-3 font-['Archivo_Black'] text-5xl lowercase leading-[.86] tracking-[-.08em] md:text-7xl">
-                choose a
-                <br />
-                direction.
-              </h2>
-              <p className="mt-5 max-w-[240px] text-xs leading-5 text-muted-foreground">
-                not every object is for the same kind of night.
-              </p>
-            </div>
-            <div className="border-y border-border">
-              {categories.map((name, i) => (
-                <button
-                  key={name}
-                  onClick={() => {
-                    setCategory(name);
-                    setCollection("all");
-                    go("shop");
-                  }}
-                  className="group flex min-h-16 w-full items-center justify-between gap-4 border-b border-border text-left last:border-0 md:min-h-20"
-                >
-                  <div className="flex items-center gap-4">
-                    <SystemLabel className="text-primary">0{i + 1}</SystemLabel>
-                    <div>
-                      <span className="block text-sm font-semibold lowercase">{name}</span>
-                      <SystemLabel className="text-muted-foreground">shop the {name} edit</SystemLabel>
-                    </div>
-                  </div>
-                  <ArrowRight size={16} className="transition group-hover:translate-x-1" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
-      {editorialCollection && (
-        <section className="relative min-h-[78svh] overflow-hidden bg-[#17171a] md:min-h-[72svh]">
-          <img
-            src={editorialCollection.imageUrl}
-            alt={`${editorialCollection.title} editorial campaign`}
-            className="absolute inset-0 size-full object-cover object-[55%_center] opacity-70"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(10,10,12,.94),transparent_68%),linear-gradient(90deg,rgba(10,10,12,.72),transparent_65%)]" />
-          <div className="relative flex min-h-[78svh] max-w-xl flex-col justify-end px-4 pb-16 pt-20 md:min-h-[72svh] md:px-8">
-            <SystemLabel className="text-primary">editorial / {editorialCollection.title}</SystemLabel>
-            <h2 className="mt-3 font-['Archivo_Black'] text-[clamp(4rem,10vw,8rem)] lowercase leading-[.8] tracking-[-.09em]">
-              {editorialCollection.title}
-              <br />
-              in motion.
-            </h2>
-            <p className="mt-6 max-w-[230px] text-sm leading-6 text-white/70">{editorialCollection.copy}</p>
-            <button
-              onClick={() => {
-                setCollection(editorialCollection.title);
-                go("collections");
-              }}
-              className="mt-8 flex w-fit items-center gap-2 border-b border-primary pb-2 text-primary"
-            >
-              <SystemLabel>enter the room</SystemLabel>
-              <ArrowDownRight size={16} />
-            </button>
-          </div>
-        </section>
-      )}
-      {archiveProducts.length > 0 && (
-        <section className="relative overflow-hidden border-y border-border bg-[#16161a] px-4 py-16 md:px-8 md:py-24">
-          <div className="absolute -right-8 top-4 font-['Archivo_Black'] text-[8rem] leading-none tracking-[-.11em] text-white/[.035] md:text-[18rem]">
-            ARCHIVE
-          </div>
-          <div className="relative grid gap-12 md:grid-cols-[.8fr_1.2fr] md:items-end">
-            <div>
-              <SystemLabel className="text-primary">storage / open</SystemLabel>
-              <h2 className="mt-3 max-w-sm font-['Archivo_Black'] text-5xl lowercase leading-[.86] tracking-[-.08em]">
-                from the
-                <br />
-                backlog.
-              </h2>
-              <button onClick={() => go("archive")} className="mt-8 flex items-center gap-2 border-b border-white/30 pb-2">
-                <SystemLabel>enter archive</SystemLabel>
-                <ArrowUpRight size={15} />
-              </button>
-            </div>
-            <button onClick={() => go("archive")} className="grid grid-cols-2 gap-3 text-left">
-              <div className="aspect-[.75] overflow-hidden">
-                <img
-                  src={archiveProducts[0]?.imageUrl}
-                  alt={archiveProducts[0]?.title ?? "Archive look"}
-                  className="size-full object-cover"
-                />
-              </div>
-              <div className="mt-10 aspect-[.75] overflow-hidden">
-                <img
-                  src={archiveProducts[1]?.imageUrl ?? archiveProducts[0]?.imageUrl}
-                  alt={archiveProducts[1]?.title ?? "Archive look"}
-                  className="size-full object-cover"
-                />
-              </div>
-            </button>
-          </div>
-        </section>
-      )}
-      {curatedProducts.length > 0 && (
-        <section className="px-4 py-20 md:px-8 md:py-28">
-          <div className="grid gap-8 border-b border-border pb-10 md:grid-cols-[1fr_1.2fr]">
-            <div>
-              <SystemLabel className="text-primary">curated by / 3am assembly</SystemLabel>
-              <h2 className="mt-3 font-['Archivo_Black'] text-5xl lowercase leading-[.86] tracking-[-.08em]">
-                worn together
-                <br />
-                on purpose.
-              </h2>
-              <button
-                onClick={() => {
-                  setCategory(categories[0] ?? "all");
-                  go("shop");
-                }}
-                className="mt-7 flex items-center gap-2"
-              >
-                <SystemLabel>see the fit</SystemLabel>
-                <ArrowRight size={15} />
-              </button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {curatedProducts.map((item, i) => (
-                <button
-                  key={item.id}
-                  onClick={() => openProduct(item)}
-                  className={i === 1 ? "mt-10 text-left" : "text-left"}
-                >
-                  <div className="aspect-[.72] overflow-hidden bg-card">
-                    <img src={item.imageUrl} alt={item.title} className="size-full object-cover" />
-                  </div>
-                  <SystemLabel className="mt-2 block text-muted-foreground">{item.title}</SystemLabel>
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-      <section className="border-t border-border bg-[#121216] px-4 py-20 md:px-8 md:py-28">
-        <div className="grid gap-8 md:grid-cols-[1fr_.9fr]">
-          <div>
-            <SystemLabel className="text-primary">continue exploring</SystemLabel>
-            <h2 className="mt-3 max-w-md font-['Archivo_Black'] text-5xl lowercase leading-[.86] tracking-[-.08em] md:text-7xl">
-              there&apos;s more
-              <br />
-              in the signal.
-            </h2>
-          </div>
-          <div className="grid gap-2">
-            {[
-              ["shop all objects", "shop"],
-              ["enter collections", "collections"],
-              ["open the archive", "archive"],
-            ].map(([label, destination], i) => (
-              <button
-                key={destination}
-                onClick={() => go(destination as View)}
-                className="group flex min-h-16 items-center justify-between border border-white/20 px-4 text-left transition hover:border-primary md:min-h-20"
-              >
-                <div>
-                  <SystemLabel className="text-primary">0{i + 1}</SystemLabel>
-                  <span className="ml-3 text-sm font-semibold lowercase">{label}</span>
-                </div>
-                <ArrowUpRight size={16} className="transition group-hover:translate-x-1 group-hover:-translate-y-1" />
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-    </>
+    <HomepageRuntime
+      heroProduct={heroProduct}
+      featuredProducts={featuredProducts}
+      homeCollections={homeCollections}
+      newArrivalProducts={newArrivalProducts}
+      trendingProducts={trendingProducts}
+      categories={categories}
+      productsCount={products.length}
+      editorialCollection={editorialCollection}
+      archiveProducts={archiveProducts}
+      curatedProducts={curatedProducts}
+      presentations={presentations}
+      strip={strip}
+      onOpenProduct={openProduct}
+      onOpenAdd={openAdd}
+      onGo={go}
+      onSelectCollection={(title) => {
+        setCollection(title);
+      }}
+      onSelectCategory={(name) => {
+        setCategory(name);
+        setCollection("all");
+      }}
+      onSetStrip={setStrip}
+      onWishlistToggle={toggleWish}
+      onQuickAdd={openAdd}
+      isWishlisted={(id) => wishlist.includes(id)}
+    />
   );
 
   const Shop = () => (
@@ -776,7 +510,12 @@ function App() {
     </section>
   );
 
-  const ProductDetail = () => (
+  const ProductDetail = () => {
+    const detailProduct = selected ?? products[0];
+
+    if (!detailProduct) return null;
+
+    return (
     <section className="min-h-screen pb-28 pt-16">
       <button
         onClick={back}
@@ -787,21 +526,26 @@ function App() {
       </button>
       <div className="grid md:grid-cols-[1.35fr_.65fr]">
         <div className="relative min-h-[68svh] bg-[#171719] md:min-h-screen">
-          <img src={selected.imageUrl} alt={selected.title} className="absolute inset-0 size-full object-cover" />
-          <div className="absolute bottom-5 left-4 flex gap-1">
+          <img src={detailProduct.imageUrl} alt={detailProduct.title} className="absolute inset-0 size-full object-cover" />
+          <div className="absolute inset-0 z-10 flex items-center justify-center opacity-60 pointer-events-none md:hidden">
+            <Suspense fallback={<div className="size-16" />}>
+              <FingerGestureAnimation size={64} triggerOnView playOnce colorMode="accent" />
+            </Suspense>
+          </div>
+          <div className="absolute bottom-5 left-4 flex gap-1 z-20">
             <span className="h-1 w-12 bg-primary" />
             <span className="h-1 w-5 bg-white/40" />
             <span className="h-1 w-5 bg-white/40" />
           </div>
         </div>
         <div className="flex min-h-[32svh] flex-col border-l border-border px-4 pb-8 pt-7 md:min-h-screen md:px-8 md:pt-28">
-          <SystemLabel className="text-primary">current object / {selected.tag}</SystemLabel>
+          <SystemLabel className="text-primary">current object / {detailProduct.tag}</SystemLabel>
           <h1 className="mt-3 font-['Archivo_Black'] text-5xl leading-[.84] lowercase tracking-[-.075em] sm:text-7xl">
-            {selected.title}
+            {detailProduct.title}
           </h1>
           <div className="mt-7 flex justify-between border-y border-border py-4">
             <SystemLabel>retail</SystemLabel>
-            <SystemLabel>{selected.price.formatted}</SystemLabel>
+            <SystemLabel>{detailProduct.price.formatted}</SystemLabel>
           </div>
           <p className="mt-6 max-w-sm text-sm leading-6 text-[#b5b5b9]">
             Cut for the hour after the city turns blue. Light shell, high collar, no extra signal.
@@ -826,25 +570,27 @@ function App() {
             </div>
           </div>
           <button
-            onClick={() => toggleWish(selected.id)}
-            aria-pressed={wishlist.includes(selected.id)}
+            onClick={() => toggleWish(detailProduct.id)}
+            aria-pressed={wishlist.includes(detailProduct.id)}
             className={
-              wishlist.includes(selected.id)
+              wishlist.includes(detailProduct.id)
                 ? "mt-8 flex h-12 w-full items-center justify-between border border-primary px-4 text-primary"
                 : "mt-8 flex h-12 w-full items-center justify-between border border-white/25 px-4 text-foreground"
             }
           >
             <span className="font-mono text-[11px] uppercase tracking-[.14em]">
-              {wishlist.includes(selected.id) ? "saved to wishlist" : "save to wishlist"}
+              {wishlist.includes(detailProduct.id) ? "saved to wishlist" : "save to wishlist"}
             </span>
-            <Heart size={16} fill={wishlist.includes(selected.id) ? "currentColor" : "none"} />
+            <Heart size={16} fill={wishlist.includes(detailProduct.id) ? "currentColor" : "none"} />
           </button>
           <button
-            onClick={() => openAdd(selected)}
+            onClick={() => openAdd(detailProduct)}
             className="mt-2 flex h-16 w-full items-center justify-between border border-primary bg-primary px-4 text-primary-foreground transition active:scale-[.98]"
           >
             <span className="font-['Archivo_Black'] text-xl lowercase tracking-[-.05em]">move to inventory</span>
-            <ArrowDownRight />
+            <Suspense fallback={<div className="size-6" />}>
+              <BagArrowAnimation size={24} triggerOnView playOnce colorMode="monochrome" />
+            </Suspense>
           </button>
         </div>
       </div>
@@ -852,7 +598,7 @@ function App() {
         <SectionHeading kicker="same frequency" title="keep moving." />
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {products
-            .filter((p) => p.id !== selected.id)
+            .filter((p) => p.id !== detailProduct.id)
             .slice(0, 4)
             .map((p, i) => (
               <ProductCard
@@ -867,7 +613,8 @@ function App() {
         </div>
       </div>
     </section>
-  );
+    );
+  };
 
   const SearchView = () => {
     const displayed = query ? queryResults : products;
@@ -1061,7 +808,452 @@ function App() {
     </section>
   );
 
-  const content: Record<View, React.ReactNode> = {
+  // ─── Overlay Components (defined inside App for closure access) ────────────
+  // forwardRef pattern lets App.tsx hold a ref to the DOM element
+  // while the component itself owns its animation logic via useGSAP.
+
+  type InventoryOverlayProps = {
+    open: boolean;
+    product: ProductModel | null;
+    size: string;
+    quantity: number;
+    onClose: () => void;
+    onSetSize: (s: string) => void;
+    onSetQuantity: (q: number) => void;
+    onAddItem: () => void;
+  };
+
+  // eslint-disable-next-line react/display-name
+  const InventoryOverlay = forwardRef<HTMLDivElement, InventoryOverlayProps>(
+    ({ open, product, size, quantity, onClose, onSetSize, onSetQuantity, onAddItem }, ref) => {
+      const containerRef = useRef<HTMLDivElement>(null);
+
+      // Sync external ref
+      useEffect(() => {
+        if (typeof ref === "function") ref(containerRef.current);
+        else if (ref) ref.current = containerRef.current;
+      });
+
+      // GSAP-driven enter/exit based on open state
+      useGSAP(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        if (open) {
+          slideUpOverlay(el);
+        } else {
+          slideDownOverlay(el);
+        }
+      }, { dependencies: [open] });
+
+      if (!product) return null;
+
+      return (
+        <div
+          ref={containerRef}
+          className="overlay-layer fixed bottom-20 right-4 z-[60] w-[calc(100%-2rem)] border border-primary bg-[#17171a] p-4 shadow-2xl md:bottom-24 md:right-6 md:w-80"
+          style={{ opacity: 0, transform: 'translateY(100%)' }}
+          aria-modal="true"
+          role="dialog"
+          aria-label="Configure object"
+        >
+          <div className="flex items-center justify-between">
+            <SystemLabel className="text-primary">configure object</SystemLabel>
+            <button onClick={onClose} aria-label="Close configuration" className="grid size-8 place-items-center hover:text-primary transition-colors">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="my-4 border-y border-border py-3">
+            <div className="flex justify-between">
+              <span className="text-sm lowercase">{product.title}</span>
+              <SystemLabel>{product.price.formatted}</SystemLabel>
+            </div>
+          </div>
+          <SystemLabel>size — select</SystemLabel>
+          <div className="mt-2 grid grid-cols-4 gap-1">
+            {["XS", "S", "M", "L"].map((option) => (
+              <button
+                key={option}
+                data-size={option}
+                onClick={() => onSetSize(option)}
+                aria-pressed={size === option}
+                className={
+                  size === option
+                    ? "h-9 border border-primary bg-primary font-mono text-[10px] text-primary-foreground transition-colors"
+                    : "h-9 border border-white/20 font-mono text-[10px] hover:border-white/50 transition-colors"
+                }
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center justify-between">
+            <SystemLabel>qty</SystemLabel>
+            <div className="flex items-center border border-white/20">
+              <button
+                onClick={() => onSetQuantity(Math.max(1, quantity - 1))}
+                className="grid size-8 place-items-center hover:text-primary transition-colors"
+                aria-label="Decrease quantity"
+              >
+                <Minus size={13} />
+              </button>
+              <span className="w-7 text-center font-mono text-xs" aria-live="polite" aria-label={`Quantity: ${quantity}`}>{quantity}</span>
+              <button
+                onClick={() => onSetQuantity(quantity + 1)}
+                className="grid size-8 place-items-center hover:text-primary transition-colors"
+                aria-label="Increase quantity"
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+          </div>
+          <button
+            onClick={onAddItem}
+            className="mt-4 h-12 w-full bg-primary font-mono text-[11px] font-medium uppercase tracking-[.14em] text-primary-foreground transition-opacity hover:opacity-90 active:scale-[.98]"
+          >
+            move to pocket
+          </button>
+        </div>
+      );
+    }
+  );
+
+  type NavOverlayProps = {
+    open: boolean;
+    view: ViewModel;
+    onClose: () => void;
+    onGo: (v: ViewModel) => void;
+    onGoShop: () => void;
+  };
+
+  // eslint-disable-next-line react/display-name
+  const NavOverlay = forwardRef<HTMLDivElement, NavOverlayProps>(
+    ({ open, view, onClose, onGo, onGoShop }, ref) => {
+      const containerRef = useRef<HTMLDivElement>(null);
+
+      useEffect(() => {
+        if (typeof ref === "function") ref(containerRef.current);
+        else if (ref) ref.current = containerRef.current;
+      });
+
+      useGSAP(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        if (open) {
+          fadeScaleOverlay(el);
+        } else {
+          fadeScaleOut(el);
+        }
+      }, { dependencies: [open] });
+
+      const navItemClass = (active: boolean) =>
+        active
+          ? "flex min-h-20 items-center justify-between border border-primary bg-primary px-5 text-left text-primary-foreground transition-colors"
+          : "flex min-h-20 items-center justify-between border border-white/20 px-5 text-left text-foreground hover:border-white/40 transition-colors";
+
+      return (
+        <div
+          ref={containerRef}
+          className="overlay-layer fixed inset-0 z-[70] bg-background px-4 pb-24 pt-6 md:px-8"
+          style={{ opacity: 0, pointerEvents: open ? 'auto' : 'none' }}
+          aria-modal="true"
+          role="dialog"
+          aria-label="Site index"
+        >
+          <div className="flex items-center justify-between border-b border-border pb-4">
+            <div>
+              <SystemLabel className="text-primary">index / quick routes</SystemLabel>
+              <p className="mt-1 text-xs text-muted-foreground">keep the signal close.</p>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close index"
+              className="grid size-12 place-items-center border border-white/20 hover:border-white/50 transition-colors"
+            >
+              <X />
+            </button>
+          </div>
+          <nav aria-label="Site navigation" className="mt-12 grid gap-3 md:mt-16 md:max-w-2xl">
+            <button onClick={() => onGo("home")} className={navItemClass(view === "home")}>
+              <span className="text-lg font-medium lowercase tracking-[-.03em]">home</span>
+              <SystemLabel>01</SystemLabel>
+            </button>
+            <button onClick={onGoShop} className={navItemClass(view === "shop")}>
+              <span className="text-lg font-medium lowercase tracking-[-.03em]">shop</span>
+              <SystemLabel>02</SystemLabel>
+            </button>
+            <button onClick={() => onGo("collections")} className={navItemClass(view === "collections")}>
+              <span className="text-lg font-medium lowercase tracking-[-.03em]">collections</span>
+              <SystemLabel>03</SystemLabel>
+            </button>
+            <button onClick={() => onGo("story")} className={navItemClass(view === "story")}>
+              <span className="text-lg font-medium lowercase tracking-[-.03em]">our story</span>
+              <SystemLabel>04</SystemLabel>
+            </button>
+            <button onClick={() => onGo("contact")} className={navItemClass(view === "contact")}>
+              <span className="text-lg font-medium lowercase tracking-[-.03em]">contact</span>
+              <SystemLabel>05</SystemLabel>
+            </button>
+          </nav>
+          <div className="absolute bottom-7 left-4 right-4 border-t border-border pt-4 md:left-8 md:right-8">
+            <SystemLabel className="text-muted-foreground">index closes on route selection</SystemLabel>
+          </div>
+        </div>
+      );
+    }
+  );
+
+  const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
+  const [contactSent, setContactSent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const submitContactPayload = async (payload: typeof contactForm) => {
+    // Architecture note: Future backend endpoint (e.g., Shopify API or custom lambda)
+    // const response = await fetch('/api/contact', { method: 'POST', body: JSON.stringify(payload) });
+    // if (!response.ok) throw new Error('Transmission failed');
+    
+    // Simulating network request for architecture readiness
+    return new Promise((resolve) => setTimeout(resolve, 800));
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setFormError("");
+
+    // 1. Validation (HTML5 handles basics, explicit checks here)
+    const form = e.currentTarget;
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+
+    if (!contactForm.subject) {
+      setFormError("Please select a purpose for your transmission.");
+      return;
+    }
+
+    // 2. Payload Construction
+    const payload = {
+      ...contactForm,
+      submittedAt: new Date().toISOString(),
+    };
+
+    // 3. Submission Pipeline
+    setIsSubmitting(true);
+    try {
+      await submitContactPayload(payload);
+      setContactSent(true);
+      setTimeout(() => setContactSent(false), 4000);
+      setContactForm({ name: "", email: "", phone: "", subject: "", message: "" });
+    } catch (error) {
+      console.error("[GLYCH Contact] Error:", error);
+      setFormError("Signal lost. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const Story = () => (
+    <section className="min-h-screen px-4 pb-28 pt-28 md:px-8">
+      {/* Manifesto */}
+      <div className="border-b border-border pb-20 md:pb-32">
+        <SystemLabel className="text-primary">signal / origin</SystemLabel>
+        <h1 className="mt-6 font-['Archivo_Black'] text-[clamp(4rem,12vw,10rem)] lowercase leading-[.78] tracking-[-.1em]">
+          not
+          <br />
+          <span className="ml-[10vw] text-transparent [-webkit-text-stroke:1px_#ededed]">noise.</span>
+          <br />
+          signal.
+        </h1>
+        <p className="mt-10 max-w-md text-sm leading-7 text-white/60 md:ml-[33vw] md:mt-16">
+          GLYCH started in a back room where the city's frequency was too loud to ignore and too good to turn down.
+          We build objects for people who move differently — not against the signal, but through it.
+        </p>
+      </div>
+
+      {/* Three values */}
+      <div className="grid gap-0 border-b border-border py-20 md:grid-cols-3 md:py-28">
+        {[
+          { n: "01", title: "made for motion.", copy: "Every cut, every weight, every material decision is made for how the body moves at 2am, not 2pm." },
+          { n: "02", title: "no noise.", copy: "We don't make statements. We make objects. The statement is yours." },
+          { n: "03", title: "signal over trend.", copy: "Collections don't follow seasons. They follow frequency. When the signal changes, we change." },
+        ].map(({ n, title, copy }) => (
+          <div key={n} className="border-b border-border px-0 py-10 md:border-b-0 md:border-r md:px-8 md:last:border-r-0 md:first:pl-0">
+            <SystemLabel className="text-primary">{n}</SystemLabel>
+            <h2 className="mt-4 font-['Archivo_Black'] text-3xl lowercase leading-[.88] tracking-[-.07em] md:text-4xl">{title}</h2>
+            <p className="mt-5 text-sm leading-6 text-white/55">{copy}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Signal Timeline */}
+      <div className="py-20 md:py-28">
+        <SystemLabel className="text-primary">timeline / signal log</SystemLabel>
+        <div className="mt-10 grid gap-0 border-y border-border">
+          {[
+            { year: "2019", event: "First room.", copy: "A single pop-up. No branding. Just objects and a playlist." },
+            { year: "2021", event: "Online.", copy: "The signal goes digital. First drop sells through in 11 hours." },
+            { year: "2022", event: "New York.", copy: "Permanent space opens. The room becomes an address." },
+            { year: "2024", event: "Expanded.", copy: "Three collections. The archive begins. The frequency expands." },
+            { year: "Now", event: "Still moving.", copy: "You're here. The signal is still live." },
+          ].map(({ year, event, copy }) => (
+            <div key={year} className="grid grid-cols-[80px_1fr] items-start gap-6 border-b border-border py-7 last:border-0 md:grid-cols-[120px_1fr]">
+              <SystemLabel className="pt-px text-primary">{year}</SystemLabel>
+              <div>
+                <h3 className="font-['Archivo_Black'] text-2xl lowercase tracking-[-.06em]">{event}</h3>
+                <p className="mt-2 text-sm leading-5 text-white/50">{copy}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div className="grid gap-3 border-t border-border pt-10 md:grid-cols-2">
+        <button
+          onClick={() => go("shop")}
+          className="group flex min-h-20 items-center justify-between border border-primary bg-primary px-5 text-primary-foreground"
+        >
+          <span className="font-['Archivo_Black'] text-2xl lowercase tracking-[-.05em]">enter the shop</span>
+          <ArrowUpRight size={20} className="transition group-hover:translate-x-1 group-hover:-translate-y-1" />
+        </button>
+        <button
+          onClick={() => go("collections")}
+          className="group flex min-h-20 items-center justify-between border border-white/20 px-5 hover:border-white/40 transition-colors"
+        >
+          <span className="font-['Archivo_Black'] text-2xl lowercase tracking-[-.05em]">see collections</span>
+          <ArrowUpRight size={20} className="transition group-hover:translate-x-1 group-hover:-translate-y-1" />
+        </button>
+      </div>
+    </section>
+  );
+
+  const Contact = () => (
+    <section className="min-h-screen px-4 pb-28 pt-28 md:px-8">
+      <div className="grid gap-16 md:grid-cols-[1fr_1.1fr] md:gap-24">
+        {/* Left: intro copy */}
+        <div>
+          <SystemLabel className="text-primary">contact / open channel</SystemLabel>
+          <h1 className="mt-6 font-['Archivo_Black'] text-[clamp(3rem,9vw,7rem)] lowercase leading-[.82] tracking-[-.09em]">
+            send a
+            <br />
+            signal.
+          </h1>
+          <p className="mt-8 max-w-xs text-sm leading-7 text-white/55">
+            We read every message. Response time varies — we're usually back within 48 hours.
+          </p>
+          <div className="mt-10 grid gap-4 border-t border-border pt-8">
+            <div>
+              <SystemLabel className="text-primary">email</SystemLabel>
+              <p className="mt-1 text-sm text-white/70">signal@glych.studio</p>
+            </div>
+            <div>
+              <SystemLabel className="text-primary">location</SystemLabel>
+              <p className="mt-1 text-sm text-white/70">New York, NY — signal / 017</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: form */}
+        <div>
+          {contactSent ? (
+            <div className="flex min-h-[400px] flex-col items-start justify-center">
+              <SystemLabel className="text-primary">transmitted.</SystemLabel>
+              <h2 className="mt-4 font-['Archivo_Black'] text-4xl lowercase tracking-[-.07em]">signal received.</h2>
+              <p className="mt-4 text-sm text-white/55">We'll come back to you within 48 hours.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleContactSubmit} className="grid gap-4" noValidate={false}>
+              {formError && (
+                <div className="border border-red-500/50 bg-red-500/10 p-3">
+                  <SystemLabel className="text-red-400">{formError}</SystemLabel>
+                </div>
+              )}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <SystemLabel className="mb-2 block text-primary">name</SystemLabel>
+                  <input
+                    id="contact-name"
+                    type="text"
+                    required
+                    value={contactForm.name}
+                    onChange={(e) => setContactForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="your name"
+                    className="h-12 w-full border border-white/20 bg-transparent px-4 text-sm placeholder:text-white/25 focus:border-primary focus:outline-none transition-colors"
+                  />
+                </div>
+                <div>
+                  <SystemLabel className="mb-2 block text-primary">email</SystemLabel>
+                  <input
+                    id="contact-email"
+                    type="email"
+                    required
+                    value={contactForm.email}
+                    onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder="your@email.com"
+                    className="h-12 w-full border border-white/20 bg-transparent px-4 text-sm placeholder:text-white/25 focus:border-primary focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+              <div>
+                <SystemLabel className="mb-2 block text-primary">phone</SystemLabel>
+                <input
+                  id="contact-phone"
+                  type="tel"
+                  value={contactForm.phone}
+                  onChange={(e) => setContactForm((f) => ({ ...f, phone: e.target.value }))}
+                  placeholder="+1 (optional)"
+                  className="h-12 w-full border border-white/20 bg-transparent px-4 text-sm placeholder:text-white/25 focus:border-primary focus:outline-none transition-colors"
+                />
+              </div>
+              <div>
+                <SystemLabel className="mb-2 block text-primary">subject</SystemLabel>
+                <select
+                  id="contact-subject"
+                  required
+                  value={contactForm.subject}
+                  onChange={(e) => setContactForm((f) => ({ ...f, subject: e.target.value }))}
+                  className="h-12 w-full border border-white/20 bg-[#0a0a0c] px-4 text-sm text-white/70 focus:border-primary focus:outline-none transition-colors appearance-none"
+                >
+                  <option value="" disabled>select a purpose</option>
+                  <option value="general">general enquiry</option>
+                  <option value="order">order support</option>
+                  <option value="wholesale">wholesale / stockist</option>
+                  <option value="press">press & editorial</option>
+                  <option value="collab">collaboration</option>
+                  <option value="other">other</option>
+                </select>
+              </div>
+              <div>
+                <SystemLabel className="mb-2 block text-primary">message</SystemLabel>
+                <textarea
+                  id="contact-message"
+                  required
+                  rows={5}
+                  value={contactForm.message}
+                  onChange={(e) => setContactForm((f) => ({ ...f, message: e.target.value }))}
+                  placeholder="what's on your signal?"
+                  className="w-full border border-white/20 bg-transparent px-4 py-3 text-sm placeholder:text-white/25 focus:border-primary focus:outline-none transition-colors resize-none"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex h-14 w-full items-center justify-between border border-primary bg-primary px-5 text-primary-foreground transition active:scale-[.98] disabled:opacity-50 disabled:active:scale-100"
+              >
+                <span className="font-['Archivo_Black'] text-xl lowercase tracking-[-.04em]">
+                  {isSubmitting ? "transmitting..." : "transmit signal"}
+                </span>
+                <ArrowDownRight size={20} />
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+
+  const content: Record<ViewModel, React.ReactNode> = {
     home: <Home />,
     shop: <Shop />,
     collections: <Collections />,
@@ -1071,6 +1263,8 @@ function App() {
     profile: <Profile />,
     product: <ProductDetail />,
     search: <SearchView />,
+    story: <Story />,
+    contact: <Contact />,
   };
 
   return (
@@ -1078,11 +1272,18 @@ function App() {
       <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between p-4 mix-blend-screen md:p-6">
         <button
           onClick={() => go("home")}
-          className="font-['Archivo_Black'] text-2xl leading-none tracking-[-0.08em]"
+          className="flex items-center"
         >
-          GLITCH<span className="text-primary">.</span>
+          <GlychText 
+            text={siteConfig.brand.name + "."} 
+            font={{ fontFamily: "var(--font-heading)", fontSize: "1.5rem", fontWeight: 900, letterSpacing: "-0.08em", lineHeight: 1 }}
+            playMode="hover"
+            slice={{ enabled: true, intensity: 50, minHeight: 25, maxHeight: 75 }}
+            shake={{ enabled: false, intensity: 10, x: 10, y: 10 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
+          />
         </button>
-        <SystemLabel className="hidden md:block">signal / 017 // new york</SystemLabel>
+        <SystemLabel className="hidden md:block">{siteConfig.brand.tagline}</SystemLabel>
         <span className="size-2 animate-pulse bg-primary" aria-hidden="true" />
       </header>
       {view !== "home" && view !== "product" && (
@@ -1094,7 +1295,10 @@ function App() {
           <SystemLabel>back</SystemLabel>
         </button>
       )}
-      {content[view]}
+      {/* View container — receives enter/exit GSAP transitions */}
+      <div ref={viewContainerRef} className="will-animate">
+        {content[view]}
+      </div>
       <div className="fixed bottom-4 left-4 right-4 z-50 flex items-end justify-between gap-2 md:bottom-6 md:left-6 md:right-6">
         <div className="flex gap-2">
           <BottomControl icon={<Menu size={17} />} label="index" onClick={() => setNavOpen(true)} active={navOpen} />
@@ -1114,7 +1318,9 @@ function App() {
             <Heart size={17} fill={wishlist.length ? "currentColor" : "none"} />
           </button>
           <button
+            ref={cartButtonRef}
             onClick={() => go("cart")}
+            aria-label={`Inventory${cart.length > 0 ? `, ${cart.length} items` : ""}`}
             className="relative flex h-14 items-center gap-2 border border-primary bg-primary px-4 text-primary-foreground shadow-[0_0_32px_rgba(198,255,61,.14)] transition active:scale-95"
           >
             <ShoppingBag size={18} />
@@ -1127,127 +1333,36 @@ function App() {
           </button>
         </div>
       </div>
-      {inventoryOpen && (
-        <div className="fixed bottom-20 right-4 z-[60] w-[calc(100%-2rem)] border border-primary bg-[#17171a] p-4 shadow-2xl md:bottom-24 md:right-6 md:w-80">
-          <div className="flex items-center justify-between">
-            <SystemLabel className="text-primary">configure object</SystemLabel>
-            <button onClick={() => setInventoryOpen(false)} aria-label="Close configuration">
-              <X size={16} />
-            </button>
-          </div>
-          <div className="my-4 border-y border-border py-3">
-            <div className="flex justify-between">
-              <span className="text-sm lowercase">{selected.title}</span>
-              <SystemLabel>{selected.price.formatted}</SystemLabel>
-            </div>
-          </div>
-          <SystemLabel>size — select</SystemLabel>
-          <div className="mt-2 grid grid-cols-4 gap-1">
-            {["XS", "S", "M", "L"].map((option) => (
-              <button
-                key={option}
-                onClick={() => setSize(option)}
-                aria-pressed={size === option}
-                className={
-                  size === option
-                    ? "h-9 border border-primary bg-primary font-mono text-[10px] text-primary-foreground"
-                    : "h-9 border border-white/20 font-mono text-[10px]"
-                }
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-          <div className="mt-4 flex items-center justify-between">
-            <SystemLabel>qty</SystemLabel>
-            <div className="flex items-center border border-white/20">
-              <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="grid size-8 place-items-center">
-                <Minus size={13} />
-              </button>
-              <span className="w-7 text-center font-mono text-xs">{quantity}</span>
-              <button onClick={() => setQuantity(quantity + 1)} className="grid size-8 place-items-center">
-                <Plus size={13} />
-              </button>
-            </div>
-          </div>
-          <button
-            onClick={() => addItem(selected)}
-            className="mt-4 h-12 w-full bg-primary font-mono text-[11px] font-medium uppercase tracking-[.14em] text-primary-foreground"
-          >
-            confirm / add
-          </button>
-        </div>
-      )}
-      {navOpen && (
-        <div className="fixed inset-0 z-[70] bg-background px-4 pb-24 pt-6 md:px-8">
-          <div className="flex items-center justify-between border-b border-border pb-4">
-            <div>
-              <SystemLabel className="text-primary">index / quick routes</SystemLabel>
-              <p className="mt-1 text-xs text-muted-foreground">keep the signal close.</p>
-            </div>
-            <button
-              onClick={() => setNavOpen(false)}
-              aria-label="Close index"
-              className="grid size-12 place-items-center border border-white/20"
-            >
-              <X />
-            </button>
-          </div>
-          <nav aria-label="Index navigation" className="mt-12 grid gap-3 md:mt-16 md:max-w-2xl">
-            <button
-              onClick={() => go("home")}
-              className={
-                view === "home"
-                  ? "flex min-h-20 items-center justify-between border border-primary bg-primary px-5 text-left text-primary-foreground"
-                  : "flex min-h-20 items-center justify-between border border-white/20 px-5 text-left text-foreground"
-              }
-            >
-              <span className="text-lg font-medium lowercase tracking-[-.03em]">new</span>
-              <SystemLabel>01</SystemLabel>
-            </button>
-            <button
-              onClick={() => go("collections")}
-              className={
-                view === "collections"
-                  ? "flex min-h-20 items-center justify-between border border-primary bg-primary px-5 text-left text-primary-foreground"
-                  : "flex min-h-20 items-center justify-between border border-white/20 px-5 text-left text-foreground"
-              }
-            >
-              <span className="text-lg font-medium lowercase tracking-[-.03em]">collections</span>
-              <SystemLabel>02</SystemLabel>
-            </button>
-            <button
-              onClick={() => {
-                setCategory("all");
-                setCollection("all");
-                go("shop");
-              }}
-              className={
-                view === "shop"
-                  ? "flex min-h-20 items-center justify-between border border-primary bg-primary px-5 text-left text-primary-foreground"
-                  : "flex min-h-20 items-center justify-between border border-white/20 px-5 text-left text-foreground"
-              }
-            >
-              <span className="text-lg font-medium lowercase tracking-[-.03em]">categories</span>
-              <SystemLabel>03</SystemLabel>
-            </button>
-            <button
-              onClick={() => go("wishlist")}
-              className={
-                view === "wishlist"
-                  ? "flex min-h-20 items-center justify-between border border-primary bg-primary px-5 text-left text-primary-foreground"
-                  : "flex min-h-20 items-center justify-between border border-white/20 px-5 text-left text-foreground"
-              }
-            >
-              <span className="text-lg font-medium lowercase tracking-[-.03em]">wishlist</span>
-              <SystemLabel>04</SystemLabel>
-            </button>
-          </nav>
-          <div className="absolute bottom-7 left-4 right-4 border-t border-border pt-4 md:left-8 md:right-8">
-            <SystemLabel className="text-muted-foreground">index closes on route selection</SystemLabel>
-          </div>
-        </div>
-      )}
+      {/* ── Inventory overlay (configure object / add to pocket) ─────────── */}
+      {/* Always mounted — GSAP animates in/out via useGSAP below */}
+      <InventoryOverlay
+        ref={inventoryOverlayRef}
+        open={inventoryOpen && !!activeProduct}
+        product={activeProduct}
+        size={size}
+        quantity={quantity}
+        onClose={() => setInventoryOpen(false)}
+        onSetSize={(s) => {
+          setSize(s);
+          // Size selector spring — tactile feedback
+          const btn = inventoryOverlayRef.current?.querySelector(
+            `[data-size="${s}"]`
+          );
+          if (btn) gsap.fromTo(btn, { scale: 0.88 }, { scale: 1, duration: 0.3, ease: "elastic.out(1.2, 0.4)" });
+        }}
+        onSetQuantity={setQuantity}
+        onAddItem={() => addItem(activeProduct ?? undefined)}
+      />
+
+      {/* ── Nav overlay (index / quick routes) ───────────────────────────── */}
+      <NavOverlay
+        ref={navOverlayRef}
+        open={navOpen}
+        view={view}
+        onClose={() => setNavOpen(false)}
+        onGo={(v) => { go(v); }}
+        onGoShop={() => { setCategory("all"); setCollection("all"); go("shop"); }}
+      />
     </main>
   );
 }
