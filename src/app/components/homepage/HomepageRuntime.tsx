@@ -14,7 +14,8 @@ import { SystemLabel, SectionHeading } from "@/components/primitives";
 import { ProductCard, ProductGrid } from "@/components/product";
 import { siteConfig } from "@/config/site.config";
 import { createHeroParallax, createSceneTransitions } from "@/animations/gsap/timelines/scrollAnimations";
-import { BagArrowAnimation, PageScrollAnimation, GlychText, SliderArrowAnimation } from "@/components/motion";
+import { BagArrowAnimation, ScrollDownAnimation, ScrollingAnimation, ScrollToAnimation, GlychText, SliderArrowAnimation } from "@/components/motion";
+import type { AnimationControls } from "@/components/motion";
 import { Suspense } from "react";
 
 interface HomepageRuntimeProps {
@@ -77,8 +78,15 @@ export function HomepageRuntime({
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [hasScrolled, setHasScrolled] = useState(false);
   const heroRef = useRef<HTMLElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
+  
+  // State for behavioral refinements
+  const [heroVisible, setHeroVisible] = useState(true);
+  const [footerArrived, setFooterArrived] = useState(false);
+  const [scrollingComplete, setScrollingComplete] = useState(false);
+  const [hasUsedCarousel, setHasUsedCarousel] = useState(false);
+  const bagArrowRef = useRef<AnimationControls>(null);
   
   // Hero Parallax Layers
   const ambientRef = useRef<HTMLDivElement>(null);
@@ -88,14 +96,41 @@ export function HomepageRuntime({
   const ctaRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 50 && !hasScrolled) {
-        setHasScrolled(true);
-      }
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [hasScrolled]);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.target === heroRef.current) {
+            setHeroVisible(entry.isIntersecting);
+            // Restore Hero state on re-entry
+            if (entry.isIntersecting) {
+              bagArrowRef.current?.play();
+            }
+          } else if (entry.target === footerRef.current && entry.isIntersecting) {
+            const hasArrived = sessionStorage.getItem("glych_footer_arrived");
+            if (!hasArrived) {
+              sessionStorage.setItem("glych_footer_arrived", "true");
+              setFooterArrived(true);
+            } else {
+              setScrollingComplete(true);
+            }
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    if (heroRef.current) observer.observe(heroRef.current);
+    if (footerRef.current) observer.observe(footerRef.current);
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Track carousel interaction to gracefully suppress guidance
+  useEffect(() => {
+    if (strip > 0 && !hasUsedCarousel) {
+      setHasUsedCarousel(true);
+    }
+  }, [strip, hasUsedCarousel]);
 
   useGSAP(() => {
     // 1. Initialize Master Hero Parallax
@@ -157,43 +192,92 @@ export function HomepageRuntime({
           <SystemLabel className="mb-4 text-primary">
             drop / {heroProduct?.collectionTitle ?? "current release"}
           </SystemLabel>
-          <h1 className="max-w-4xl font-['Archivo_Black'] text-[clamp(4.5rem,15vw,12rem)] leading-[.78] tracking-[-.09em]">
-            DON&apos;T
+          {/* Hero brand typography — GlychText owns the identity, staggered intervals prevent sync */}
+          <h1 className="max-w-4xl font-['Archivo_Black'] text-[clamp(4.5rem,15vw,12rem)] leading-[.78] tracking-[-.09em]" aria-label="Don't Stand Still">
+            <GlychText
+              text="DON'T"
+              font={{ fontFamily: "var(--font-heading)", fontSize: "clamp(4.5rem,15vw,12rem)", fontWeight: 900, letterSpacing: "-0.09em", lineHeight: 0.78 }}
+              color="white"
+              playMode="loop"
+              transition={{ duration: 0.45, ease: "easeOut", delay: 0, loopInterval: 13 }}
+              slice={{ enabled: true, intensity: 60, minHeight: 20, maxHeight: 80 }}
+              shake={{ enabled: true, intensity: 8, x: 6, y: 4 }}
+            />
             <br />
-            <span className="ml-[8vw] text-transparent [-webkit-text-stroke:1px_#ededed]">STAND</span>
+            <span className="ml-[8vw] inline-block">
+              <GlychText
+                text="STAND"
+                font={{ fontFamily: "var(--font-heading)", fontSize: "clamp(4.5rem,15vw,12rem)", fontWeight: 900, letterSpacing: "-0.09em", lineHeight: 0.78 }}
+                color="transparent"
+                className="[-webkit-text-stroke:1px_#ededed]"
+                playMode="loop"
+                transition={{ duration: 0.5, ease: "easeOut", delay: 0, loopInterval: 17 }}
+                slice={{ enabled: true, intensity: 55, minHeight: 15, maxHeight: 85 }}
+                shake={{ enabled: true, intensity: 6, x: 5, y: 3 }}
+              />
+            </span>
             <br />
-            STILL.
+            <GlychText
+              text="STILL."
+              font={{ fontFamily: "var(--font-heading)", fontSize: "clamp(4.5rem,15vw,12rem)", fontWeight: 900, letterSpacing: "-0.09em", lineHeight: 0.78 }}
+              color="white"
+              playMode="loop"
+              transition={{ duration: 0.4, ease: "easeOut", delay: 0, loopInterval: 11 }}
+              slice={{ enabled: true, intensity: 65, minHeight: 25, maxHeight: 75 }}
+              shake={{ enabled: true, intensity: 9, x: 7, y: 5 }}
+            />
           </h1>
-          <div className="mt-8 flex items-end justify-between gap-6 md:ml-[33vw] md:max-w-md">
+          <div className="mt-8 flex flex-col items-start gap-8 md:ml-[33vw] md:max-w-md">
             <p className="max-w-[190px] text-xs leading-5 text-white/65">
               the city keeps loading. wear something that catches up.
             </p>
+
+            {/* Native Interaction Layer: embedded directly in the typography composition */}
+            {heroProduct && (
+              <div
+                className={`transition-opacity duration-700 ${heroVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                style={{ animation: 'glych-fade-in 1s ease 1s both' }}
+              >
+                <button
+                  ref={ctaRef}
+                  onClick={() => onOpenAdd(heroProduct)}
+                  aria-label={`Move ${heroProduct.title} to pocket`}
+                  className="group relative flex items-center gap-2.5 text-primary outline-none"
+                  style={{ willChange: "transform" }}
+                >
+                  {/* Label: the exact hit target */}
+                  <span className="font-mono text-[0.7rem] font-medium uppercase tracking-[0.12em]">
+                    move to pocket
+                  </span>
+                  
+                  {/* BagArrow: placed after text to guide eye toward top-right cart */}
+                  <Suspense fallback={<div className="size-5" />}>
+                    <BagArrowAnimation
+                      controlRef={bagArrowRef}
+                      size={20}
+                      autoplay={true}
+                      loop={false}
+                      speed={0.7}
+                      onComplete={() => {
+                        if (heroVisible) {
+                          setTimeout(() => bagArrowRef.current?.play(), 2500);
+                        }
+                      }}
+                      colorMode="accent"
+                      ariaLabel="Add to pocket"
+                    />
+                  </Suspense>
+
+                  {/* Affordance: exactly spans the interaction bounds */}
+                  <span
+                    className="absolute -bottom-1.5 left-0 h-px w-full origin-left scale-x-0 bg-primary transition-transform duration-300 ease-out group-hover:scale-x-100 group-focus-visible:scale-x-100"
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Layer 5: Primary CTA (Closest to camera, moves fastest) */}
-        {heroProduct && (
-          <div className="absolute bottom-28 right-4 md:bottom-24 md:right-8 md:left-auto left-4 md:translate-x-0 z-10 flex justify-end">
-             <button
-              ref={ctaRef}
-              onClick={() => onOpenAdd(heroProduct)}
-              className="group flex w-fit items-center gap-2 border-b border-primary/40 hover:border-primary pb-1.5 text-primary transition-colors"
-              style={{ willChange: "transform" }}
-            >
-              <Suspense fallback={<div className="size-4" />}>
-                <BagArrowAnimation size={18} triggerOnView playOnce colorMode="accent" />
-              </Suspense>
-              <GlychText
-                text="move to pocket"
-                font={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", letterSpacing: "0.05em", fontWeight: 500 }}
-                playMode="loop"
-                slice={{ enabled: true, intensity: 30, minHeight: 20, maxHeight: 80 }}
-                shake={{ enabled: false, intensity: 10, x: 10, y: 10 }}
-                transition={{ duration: 0.6, ease: "easeOut", delay: 0, loopInterval: 6 }}
-              />
-            </button>
-          </div>
-        )}
 
         {/* Layer 4: Floating UI (Inherits subject movement, anchored near product focus) */}
         {heroProduct && (
@@ -211,13 +295,24 @@ export function HomepageRuntime({
           </button>
         )}
 
-        {/* Layer 6: Scroll Hint */}
-        <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 z-10 transition-opacity duration-1000 ${hasScrolled ? 'opacity-0 pointer-events-none' : 'opacity-70'}`}>
+        {/* Layer 6: Scroll Hint — loops autonomously, fades when user scrolls, tied to GSAP settle */}
+        <div
+          className={`absolute bottom-8 left-1/2 -translate-x-1/2 z-10 transition-opacity duration-1000 ${heroVisible ? 'opacity-60' : 'opacity-0 pointer-events-none'}`}
+          aria-hidden="true"
+          style={{ animation: 'glych-fade-in 1s ease 2.5s both' }}
+        >
           <Suspense fallback={<div className="size-10" />}>
-            <PageScrollAnimation size={40} triggerOnView playOnce colorMode="accent" />
+            <ScrollDownAnimation size={40} colorMode="accent" ariaLabel="Scroll to explore" />
           </Suspense>
         </div>
       </section>
+      
+      <style>{`
+        @keyframes glych-fade-in {
+          from { opacity: 0; }
+          to { opacity: 0.6; }
+        }
+      `}</style>
       {featuredProducts.length > 0 && (
         <section className="px-4 py-20 md:px-8 md:py-32">
           <SectionHeading
@@ -325,18 +420,28 @@ export function HomepageRuntime({
             <button
               onClick={() => onSetStrip(Math.max(0, strip - 1))}
               aria-label="Previous products"
-              className="grid size-10 place-items-center border border-white/20 disabled:opacity-30"
+              className="relative grid size-10 place-items-center border border-white/20 disabled:opacity-30 group"
               disabled={strip === 0}
             >
-              <ChevronLeft size={17} />
+              <ChevronLeft size={17} className={`transition-opacity ${!hasUsedCarousel ? 'opacity-30' : 'opacity-100'}`} />
+              {!hasUsedCarousel && (
+                <div className="absolute inset-0 grid place-items-center pointer-events-none rotate-180 mix-blend-difference opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Suspense fallback={<div />}><SliderArrowAnimation size={24} colorMode="accent" autoplay loop /></Suspense>
+                </div>
+              )}
             </button>
             <button
               onClick={() => onSetStrip(Math.min(newArrivalProducts.length - 3, strip + 1))}
               aria-label="Next products"
-              className="grid size-10 place-items-center border border-white/20 disabled:opacity-30"
+              className="relative grid size-10 place-items-center border border-white/20 disabled:opacity-30 group"
               disabled={strip >= newArrivalProducts.length - 3}
             >
-              <ChevronRight size={17} />
+              <ChevronRight size={17} className={`transition-opacity ${!hasUsedCarousel ? 'opacity-30' : 'opacity-100'}`} />
+              {!hasUsedCarousel && (
+                <div className="absolute inset-0 grid place-items-center pointer-events-none mix-blend-difference opacity-80 group-hover:opacity-100 transition-opacity">
+                  <Suspense fallback={<div />}><SliderArrowAnimation size={24} colorMode="accent" autoplay loop /></Suspense>
+                </div>
+              )}
             </button>
           </div>
         </section>
@@ -568,7 +673,7 @@ export function HomepageRuntime({
       </section>
 
       {/* ── Footer ─────────────────────────────────────────────────────── */}
-      <footer data-scene-anchor="true" data-scene="arrival" data-scene-align="top" className="border-t border-border bg-[#08080b] px-4 pt-16 pb-8 md:px-8 md:pt-20">
+      <footer ref={footerRef} data-scene-anchor="true" data-scene="arrival" data-scene-align="top" className="border-t border-border bg-[#08080b] px-4 pt-16 pb-8 md:px-8 md:pt-20">
         {/* Top row: logo + signal line */}
         <div className="flex items-start justify-between border-b border-border pb-10">
           <div>
@@ -583,7 +688,7 @@ export function HomepageRuntime({
                 playMode="loop"
                 slice={{ enabled: true, intensity: 40, minHeight: 20, maxHeight: 80 }}
                 shake={{ enabled: false, intensity: 10, x: 10, y: 10 }}
-                transition={{ duration: 0.8, ease: "easeOut", delay: 0.2, loopInterval: 5 }}
+                transition={{ duration: 0.8, ease: "easeOut", delay: 0.2, loopInterval: 7 }}
               />
             </button>
             <p className="mt-3 text-xs text-white/35">{siteConfig.brand.tagline}</p>
@@ -677,12 +782,31 @@ export function HomepageRuntime({
           </div>
         </div>
 
-        {/* Bottom bar */}
+        {/* Bottom bar with integrated Footer Return Guidance */}
         <div className="flex flex-col gap-3 border-t border-border pt-6 md:flex-row md:items-center md:justify-between">
           <SystemLabel className="text-white/25">© {siteConfig.brand.copyrightYear} {siteConfig.brand.name}. All rights reserved.</SystemLabel>
-          <div className="flex gap-6">
-            <button className="text-xs text-white/25 transition hover:text-white/60">Privacy Policy</button>
-            <button className="text-xs text-white/25 transition hover:text-white/60">Terms of Use</button>
+          <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
+            <div className="flex gap-6">
+              <button className="text-xs text-white/25 transition hover:text-white/60">Privacy Policy</button>
+              <button className="text-xs text-white/25 transition hover:text-white/60">Terms of Use</button>
+            </div>
+            
+            {/* Inline Footer Guidance (Continuous Transition) */}
+            <div className="relative size-8 opacity-50 transition-opacity hover:opacity-100">
+              <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Return to top" className="absolute inset-0 size-full z-10" />
+              <Suspense fallback={<div className="size-full" />}>
+                {footerArrived && !scrollingComplete && (
+                  <div className="absolute inset-0 pointer-events-none" style={{ animation: "glych-fade-in 0.5s ease" }}>
+                    <ScrollingAnimation size={32} colorMode="accent" onComplete={() => setScrollingComplete(true)} />
+                  </div>
+                )}
+                {scrollingComplete && (
+                  <div className="absolute inset-0 pointer-events-none" style={{ animation: "glych-fade-in 1s ease" }}>
+                    <ScrollToAnimation size={32} colorMode="accent" />
+                  </div>
+                )}
+              </Suspense>
+            </div>
           </div>
         </div>
       </footer>

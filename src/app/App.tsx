@@ -9,12 +9,15 @@ import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Heart,
   Menu,
   Minus,
   Plus,
   Search,
   ShoppingBag,
+  SlidersHorizontal,
+  TrendingUp,
   X,
 } from "lucide-react";
 import type { CollectionModel, ProductModel, ViewModel } from "@/domain/shared/models";
@@ -616,80 +619,372 @@ function App() {
     );
   };
 
+  // ── Search mocked data ──────────────────────────────────────────────────────
+  const SUGGESTED_SEARCHES = [
+    "nylon shell",
+    "cargo",
+    "oversized",
+    "technical",
+    "signal series",
+    "archive drop",
+  ];
+  const TRENDING_SEARCHES = [
+    "drift jacket",
+    "data vest",
+    "phantom tee",
+    "loop cargo",
+    "grid hoodie",
+  ];
+
   const SearchView = () => {
-    const displayed = query ? queryResults : products;
+    const [localQuery, setLocalQuery] = useState(query);
+    const [activeFilter, setActiveFilter] = useState("all");
+    const [sortBy, setSortBy] = useState<"default" | "price-asc" | "price-desc">("default");
+    const [showFilters, setShowFilters] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const resultsRef = useRef<HTMLDivElement>(null);
+
+    // Debounce search — show skeleton briefly, then results
+    useEffect(() => {
+      if (localQuery === query) return;
+      setIsSearching(true);
+      const t = setTimeout(() => {
+        setQuery(localQuery);
+        setIsSearching(false);
+      }, 280);
+      return () => clearTimeout(t);
+    }, [localQuery]);
+
+    // Fade results in when they change
+    useEffect(() => {
+      if (resultsRef.current && !isSearching) {
+        resultsRef.current.style.opacity = "0";
+        resultsRef.current.style.transform = "translateY(8px)";
+        const raf = requestAnimationFrame(() => {
+          if (resultsRef.current) {
+            resultsRef.current.style.transition = "opacity 0.28s ease, transform 0.28s ease";
+            resultsRef.current.style.opacity = "1";
+            resultsRef.current.style.transform = "translateY(0)";
+          }
+        });
+        return () => cancelAnimationFrame(raf);
+      }
+    }, [query, isSearching]);
+
+    // Keyboard: Escape clears or exits
+    useEffect(() => {
+      const handleKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          if (localQuery) {
+            setLocalQuery("");
+            setQuery("");
+            inputRef.current?.focus();
+          } else {
+            go("home");
+          }
+        }
+      };
+      window.addEventListener("keydown", handleKey);
+      return () => window.removeEventListener("keydown", handleKey);
+    }, [localQuery]);
+
+    const filterCategories = ["all", ...categories];
+
+    const rawResults = useMemo(() => {
+      const base = localQuery ? selectProductsBySearchQuery(products, localQuery) : products;
+      const filtered = activeFilter === "all" ? base : base.filter((p) => p.tag === activeFilter || p.collectionTitle === activeFilter);
+      if (sortBy === "price-asc") return [...filtered].sort((a, b) => a.price.amount - b.price.amount);
+      if (sortBy === "price-desc") return [...filtered].sort((a, b) => b.price.amount - a.price.amount);
+      return filtered;
+    }, [localQuery, activeFilter, sortBy]);
+
+    const hasQuery = localQuery.trim().length > 0;
+
     return (
-      <section className="min-h-screen px-4 pb-28 pt-28 md:px-8">
-        <div className="flex items-center border-b border-white/30 pb-3">
-          <Search className="text-primary" />
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="scan the archive"
-            className="ml-3 flex-1 bg-transparent font-['Archivo_Black'] text-3xl lowercase tracking-[-.06em] outline-none placeholder:text-white/20 md:text-5xl"
-          />
-          <button
-            onClick={() => {
-              setQuery("");
-              go("home");
-            }}
-            aria-label="Close search"
-          >
-            <X />
-          </button>
-        </div>
-        {!query && recentlyViewed.length > 0 && (
-          <section className="mt-8 border-b border-border pb-7">
-            <div className="flex items-center justify-between">
-              <SystemLabel className="text-primary">recently viewed</SystemLabel>
-              <SystemLabel>{recentlyViewed.length} objects</SystemLabel>
-            </div>
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-              {recentlyViewed.map((item) => (
+      <section
+        className="min-h-screen pb-32 pt-16 md:pt-20"
+        role="search"
+        aria-label="Site search"
+      >
+        {/* ── Search Input ─────────────────────────────────────────────── */}
+        <div className="sticky top-[56px] z-30 border-b border-white/10 bg-background/95 backdrop-blur-md px-4 pb-4 pt-4 md:px-8">
+          <div className="flex items-center gap-3">
+            <Search size={20} className="shrink-0 text-primary" aria-hidden="true" />
+            <input
+              ref={inputRef}
+              id="search-input"
+              autoFocus
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={localQuery}
+              onChange={(e) => setLocalQuery(e.target.value)}
+              placeholder="scan the archive"
+              aria-label="Search products"
+              aria-autocomplete="list"
+              className="flex-1 bg-transparent font-['Archivo_Black'] text-2xl lowercase tracking-[-.04em] outline-none placeholder:text-white/20 md:text-4xl"
+            />
+            {localQuery && (
+              <button
+                id="search-clear"
+                onClick={() => { setLocalQuery(""); setQuery(""); inputRef.current?.focus(); }}
+                aria-label="Clear search"
+                className="grid size-8 shrink-0 place-items-center text-white/50 transition hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            )}
+            <button
+              id="search-close"
+              onClick={() => go("home")}
+              aria-label="Close search"
+              className="grid size-8 shrink-0 place-items-center border border-white/20 text-white/60 transition hover:border-white/50 hover:text-white"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Filter + Sort bar — only when there's a query */}
+          {hasQuery && (
+            <div
+              className="mt-3 flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]"
+              style={{ animation: "glych-search-fade-in 0.2s ease forwards" }}
+            >
+              <button
+                id="search-filter-toggle"
+                onClick={() => setShowFilters((v) => !v)}
+                aria-expanded={showFilters}
+                aria-label="Toggle filters"
+                className={`flex shrink-0 items-center gap-1.5 border px-3 py-1.5 text-[11px] font-mono uppercase tracking-[.1em] transition-colors ${
+                  showFilters ? "border-primary bg-primary text-primary-foreground" : "border-white/20 text-white/60 hover:border-white/40"
+                }`}
+              >
+                <SlidersHorizontal size={12} />
+                filter
+              </button>
+              {filterCategories.map((cat) => (
                 <button
-                  key={item.id}
-                  onClick={() => openProduct(item)}
-                  className="flex min-w-48 items-center gap-3 border border-white/20 p-2 text-left"
+                  key={cat}
+                  id={`search-filter-${cat}`}
+                  onClick={() => setActiveFilter(cat)}
+                  aria-pressed={activeFilter === cat}
+                  className={`shrink-0 border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[.08em] transition-colors ${
+                    activeFilter === cat
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-white/15 text-white/50 hover:border-white/35 hover:text-white/80"
+                  }`}
                 >
-                  <img src={item.imageUrl} alt={item.title} className="size-11 object-cover" />
-                  <div>
-                    <span className="block text-xs font-semibold lowercase">{item.title}</span>
-                    <SystemLabel className="text-muted-foreground">{item.price.formatted}</SystemLabel>
-                  </div>
+                  {cat}
                 </button>
               ))}
-            </div>
-          </section>
-        )}
-        <div className="mt-12">
-          <SectionHeading
-            kicker={query ? "results / " + queryResults.length : "trending / always in range"}
-            title={query ? "still in range." : "in your orbit."}
-          />
-          {displayed.length ? (
-            <div className="grid grid-cols-2 gap-3 md:max-w-5xl md:grid-cols-4">
-              <ShopGrid items={displayed} />
-            </div>
-          ) : (
-            <div className="border border-dashed border-white/25 p-8">
-              <SystemLabel className="text-primary">nothing in range yet</SystemLabel>
-              <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-                try collection names, object types, or another strange word.
-              </p>
-              <button
-                onClick={() => {
-                  setQuery("");
-                  go("shop");
-                }}
-                className="mt-6 flex items-center gap-2"
-              >
-                <SystemLabel>browse all objects</SystemLabel>
-                <ArrowRight size={15} />
-              </button>
+              <div className="ml-auto flex shrink-0 items-center gap-1">
+                {(["default", "price-asc", "price-desc"] as const).map((s) => (
+                  <button
+                    key={s}
+                    id={`search-sort-${s}`}
+                    onClick={() => setSortBy(s)}
+                    aria-pressed={sortBy === s}
+                    className={`border px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[.08em] transition-colors ${
+                      sortBy === s ? "border-primary bg-primary text-primary-foreground" : "border-white/15 text-white/40 hover:border-white/30"
+                    }`}
+                  >
+                    {s === "default" ? "relevant" : s === "price-asc" ? "↑ price" : "↓ price"}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
+
+        <div className="px-4 md:px-8">
+          {/* ── No Query State ─────────────────────────────────────────── */}
+          {!hasQuery && (
+            <div style={{ animation: "glych-search-fade-in 0.25s ease forwards" }}>
+              {/* Recently Viewed */}
+              {recentlyViewed.length > 0 && (
+                <div className="mt-8 border-b border-border pb-8">
+                  <div className="mb-4 flex items-center gap-2">
+                    <Clock size={12} className="text-primary" aria-hidden="true" />
+                    <SystemLabel className="text-primary">recently viewed</SystemLabel>
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none]">
+                    {recentlyViewed.map((item) => (
+                      <button
+                        key={item.id}
+                        id={`search-recent-${item.id}`}
+                        onClick={() => openProduct(item)}
+                        className="group flex min-w-[11rem] items-center gap-3 border border-white/15 p-2.5 text-left transition-colors hover:border-white/35"
+                      >
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="size-12 shrink-0 object-cover"
+                        />
+                        <div className="min-w-0">
+                          <span className="block truncate text-xs font-semibold lowercase leading-4">{item.title}</span>
+                          <SystemLabel className="mt-0.5 text-muted-foreground">{item.price.formatted}</SystemLabel>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Suggested Searches */}
+              <div className="mt-8">
+                <SystemLabel className="mb-4 text-primary">suggested</SystemLabel>
+                <div className="flex flex-wrap gap-2">
+                  {SUGGESTED_SEARCHES.map((term, i) => (
+                    <button
+                      key={term}
+                      id={`search-suggest-${i}`}
+                      onClick={() => { setLocalQuery(term); setQuery(term); }}
+                      style={{ animationDelay: `${i * 40}ms`, animation: "glych-search-chip-in 0.25s ease both" }}
+                      className="border border-white/20 px-4 py-2 font-['Archivo_Black'] text-sm lowercase tracking-[-.02em] transition-colors hover:border-primary hover:text-primary"
+                    >
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Trending */}
+              <div className="mt-10">
+                <div className="mb-4 flex items-center gap-2">
+                  <TrendingUp size={12} className="text-primary" aria-hidden="true" />
+                  <SystemLabel className="text-primary">trending now</SystemLabel>
+                </div>
+                <div className="divide-y divide-border border-y border-border">
+                  {TRENDING_SEARCHES.map((term, i) => (
+                    <button
+                      key={term}
+                      id={`search-trending-${i}`}
+                      onClick={() => { setLocalQuery(term); setQuery(term); }}
+                      className="group flex w-full items-center justify-between py-3 text-left transition-colors hover:text-primary"
+                      style={{ animationDelay: `${i * 50}ms`, animation: "glych-search-fade-in 0.3s ease both" }}
+                    >
+                      <div className="flex items-center gap-4">
+                        <SystemLabel className="text-primary group-hover:text-white transition-colors">0{i + 1}</SystemLabel>
+                        <span className="text-sm font-semibold lowercase tracking-[-.01em]">{term}</span>
+                      </div>
+                      <ArrowRight size={14} className="text-white/30 transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Query Results State ────────────────────────────────────── */}
+          {hasQuery && (
+            <div ref={resultsRef} className="mt-6">
+              {/* Results meta */}
+              <div className="mb-5 flex items-center justify-between">
+                <SystemLabel className="text-primary">
+                  {isSearching ? "scanning..." : `${rawResults.length} object${rawResults.length !== 1 ? "s" : ""} in range`}
+                </SystemLabel>
+                {localQuery && (
+                  <span className="font-['Archivo_Black'] text-base lowercase tracking-[-.03em] text-white/40">
+                    &ldquo;{localQuery}&rdquo;
+                  </span>
+                )}
+              </div>
+
+              {/* Loading Skeletons */}
+              {isSearching && (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="space-y-2" style={{ animationDelay: `${i * 40}ms` }}>
+                      <div className="aspect-[.85] w-full animate-pulse bg-white/5" />
+                      <div className="h-3 w-3/4 animate-pulse bg-white/5" />
+                      <div className="h-3 w-1/2 animate-pulse bg-white/5" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Results Grid */}
+              {!isSearching && rawResults.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                  {rawResults.map((p, i) => (
+                    <div
+                      key={p.id}
+                      id={`search-result-${p.id}`}
+                      style={{
+                        animationDelay: `${Math.min(i, 7) * 45}ms`,
+                        animation: "glych-search-result-in 0.32s ease both",
+                      }}
+                    >
+                      <ProductCard
+                        product={p}
+                        presentation={getPresentation(presentations, p.id)}
+                        compact
+                        index={i}
+                        onOpen={() => openProduct(p)}
+                        onWishlistToggle={toggleWish}
+                        onQuickAdd={openAdd}
+                        isWishlisted={wishlist.includes(p.id)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Empty Results */}
+              {!isSearching && rawResults.length === 0 && (
+                <div
+                  className="mt-12 border border-dashed border-white/20 px-8 py-12"
+                  style={{ animation: "glych-search-fade-in 0.3s ease forwards" }}
+                >
+                  <SystemLabel className="text-primary">nothing in range</SystemLabel>
+                  <h2 className="mt-4 font-['Archivo_Black'] text-3xl lowercase leading-tight tracking-[-.05em] md:text-4xl">
+                    no signal
+                    <br />
+                    <span className="text-transparent [-webkit-text-stroke:1px_#ffffff30]">for that.</span>
+                  </h2>
+                  <p className="mt-4 max-w-xs text-sm leading-6 text-white/50">
+                    try collection names, object types, or another strange word.
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {SUGGESTED_SEARCHES.slice(0, 3).map((term) => (
+                      <button
+                        key={term}
+                        onClick={() => { setLocalQuery(term); setQuery(term); }}
+                        className="border border-white/20 px-3 py-1.5 font-mono text-xs uppercase tracking-[.08em] text-white/60 transition hover:border-primary hover:text-primary"
+                      >
+                        {term}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => { go("shop"); }}
+                    className="mt-6 flex items-center gap-2"
+                  >
+                    <SystemLabel>browse all objects</SystemLabel>
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Search page keyframe definitions */}
+        <style>{`
+          @keyframes glych-search-fade-in {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes glych-search-result-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes glych-search-chip-in {
+            from { opacity: 0; transform: scale(.94); }
+            to   { opacity: 1; transform: scale(1); }
+          }
+        `}</style>
       </section>
     );
   };
@@ -1277,10 +1572,10 @@ function App() {
           <GlychText 
             text={siteConfig.brand.name + "."} 
             font={{ fontFamily: "var(--font-heading)", fontSize: "1.5rem", fontWeight: 900, letterSpacing: "-0.08em", lineHeight: 1 }}
-            playMode="hover"
+            playMode="loop"
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0, loopInterval: 11 }}
             slice={{ enabled: true, intensity: 50, minHeight: 25, maxHeight: 75 }}
             shake={{ enabled: false, intensity: 10, x: 10, y: 10 }}
-            transition={{ duration: 0.5, ease: "easeOut", delay: 0 }}
           />
         </button>
         <SystemLabel className="hidden md:block">{siteConfig.brand.tagline}</SystemLabel>
